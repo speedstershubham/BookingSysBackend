@@ -1,8 +1,8 @@
-import { initializeDatabase } from '@/database/init';
+import { runMigrations } from '@/database/migrate';
 import { logger } from '@/core/logger/logger';
 
 try {
-  await initializeDatabase();
+  await runMigrations();
   process.exit(0);
 } catch (error) {
   logger.error(error);

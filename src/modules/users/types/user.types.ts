@@ -1,12 +1,25 @@
-import type { ObjectId } from 'mongodb';
-
-export type UserDocument = {
-  _id: ObjectId;
+export type UserPublicRow = {
+  id: string;
   name: string;
   email: string;
+  created_at: Date;
+  updated_at: Date;
+};
+
+export type UserAuthRow = UserPublicRow & {
   password: string;
+};
+
+export type UserPublicRecord = {
+  id: string;
+  name: string;
+  email: string;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type UserAuthRecord = UserPublicRecord & {
+  password: string;
 };
 
 export type CreateUserInput = {
@@ -15,13 +28,7 @@ export type CreateUserInput = {
   password: string;
 };
 
-export type UserResponse = {
-  id: string;
-  name: string;
-  email: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type UserResponse = UserPublicRecord;
 
 export type InsertUserPayload = {
   name: string;

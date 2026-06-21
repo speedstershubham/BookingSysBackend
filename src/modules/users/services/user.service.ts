@@ -1,20 +1,25 @@
 import bcrypt from 'bcrypt';
 import { AppError } from '@/core/errors/app-error';
+import { isUniqueViolation } from '@/core/errors/postgres-error';
 import {
-  findAllUsers,
-  findUserByEmail,
+  buildPagination,
+  type PaginatedResult,
+  type PaginationParams,
+} from '@/core/types/pagination';
+import {
   findUserById,
+  findUsers,
   insertUser,
 } from '@/modules/users/repository/user.repository';
 import type {
   CreateUserInput,
-  UserDocument,
+  UserPublicRecord,
   UserResponse,
 } from '@/modules/users/types/user.types';
 
-function toUserResponse(user: UserDocument): UserResponse {
+function toUserResponse(user: UserPublicRecord): UserResponse {
   return {
-    id: user._id.toString(),
+    id: user.id,
     name: user.name,
     email: user.email,
     createdAt: user.createdAt,
@@ -25,24 +30,26 @@ function toUserResponse(user: UserDocument): UserResponse {
 export async function createUser(
   input: CreateUserInput,
 ): Promise<UserResponse> {
-  const existingUser = await findUserByEmail(input.email.toLowerCase());
-
-  if (existingUser) {
-    throw new AppError(409, 'Email is already registered');
-  }
-
   const now = new Date();
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
-  const user = await insertUser({
-    name: input.name.trim(),
-    email: input.email.toLowerCase(),
-    password: hashedPassword,
-    createdAt: now,
-    updatedAt: now,
-  });
+  try {
+    const user = await insertUser({
+      name: input.name.trim(),
+      email: input.email.toLowerCase(),
+      password: hashedPassword,
+      createdAt: now,
+      updatedAt: now,
+    });
 
-  return toUserResponse(user);
+    return toUserResponse(user);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new AppError(409, 'Email is already registered');
+    }
+
+    throw error;
+  }
 }
 
 export async function getUserById(id: string): Promise<UserResponse> {
@@ -55,7 +62,13 @@ export async function getUserById(id: string): Promise<UserResponse> {
   return toUserResponse(user);
 }
 
-export async function getUsers(): Promise<UserResponse[]> {
-  const users = await findAllUsers();
-  return users.map(toUserResponse);
+export async function getUsers(
+  params: PaginationParams,
+): Promise<PaginatedResult<UserResponse>> {
+  const { users, total } = await findUsers(params);
+
+  return {
+    items: users.map(toUserResponse),
+    pagination: buildPagination(params, total),
+  };
 }

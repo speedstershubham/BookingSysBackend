@@ -1,11 +1,11 @@
-import { initializeDatabase } from '@/database/init';
+import { connectDB } from '@/database/postgres';
 import { env } from '@/config/env';
 import { logger } from '@/core/logger/logger';
 import { handleRequest } from '@/routes/index';
 
 async function bootstrap() {
   try {
-    await initializeDatabase();
+    await connectDB();
 
     Bun.serve({
       port: Number(env.PORT),

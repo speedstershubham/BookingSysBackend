@@ -2,6 +2,7 @@ import { parseJsonBody } from '@/core/http/request';
 import { jsonResponse } from '@/core/http/response';
 import {
   createUserSchema,
+  listUsersQuerySchema,
   userIdSchema,
 } from '@/modules/users/validations/user.validation';
 import {
@@ -26,8 +27,13 @@ export const getUserHandler: RouteHandler = async (_req, params) => {
   return jsonResponse(user);
 };
 
-export const listUsersHandler: RouteHandler = async () => {
-  const users = await getUsers();
+export const listUsersHandler: RouteHandler = async (req) => {
+  const url = new URL(req.url);
+  const query = listUsersQuerySchema.parse({
+    page: url.searchParams.get('page') ?? undefined,
+    limit: url.searchParams.get('limit') ?? undefined,
+  });
+  const result = await getUsers(query);
 
-  return jsonResponse(users);
+  return jsonResponse(result);
 };

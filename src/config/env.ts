@@ -5,9 +5,10 @@ config();
 
 const envSchema = z.object({
   PORT: z.string().default('3000'),
-  MONGODB_URI: z.string(),
-  DB_NAME: z.string(),
+  DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
+  DB_POOL_MAX: z.coerce.number().int().positive().default(20),
+  DB_IDLE_TIMEOUT: z.coerce.number().int().positive().default(30),
 });
 
 export const env = envSchema.parse(process.env);

@@ -10,7 +10,7 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier . --write",
     "type-check": "tsc --noEmit",
-    "db:init": "bun src/scripts/init-db.ts"
+    "db:migrate": "bun src/scripts/migrate-db.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -29,15 +29,10 @@
   "peerDependencies": {
     "typescript": "^6.0.3"
   },
-  "overrides": {
-    "bson": "7.2.0"
-  },
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "bson": "7.2.0",
     "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.3",
-    "mongodb": "^7.3.0",
     "pino": "^10.3.1",
     "zod": "^4.4.3"
   }

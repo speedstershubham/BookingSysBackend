@@ -14,7 +14,12 @@ export const createUserSchema = z.object({
 });
 
 export const userIdSchema = z.object({
-  id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid user id'),
+  id: z.uuid('Invalid user id'),
+});
+
+export const listUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 export type CreateUserSchema = z.infer<typeof createUserSchema>;
