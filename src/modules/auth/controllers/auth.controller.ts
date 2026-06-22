@@ -1,4 +1,4 @@
-import { authenticate } from '@/core/auth/auth.middleware';
+import { withAuth } from '@/core/auth/auth.middleware';
 import { parseJsonBody } from '@/core/http/request';
 import { jsonResponse } from '@/core/http/response';
 import {
@@ -10,9 +10,8 @@ import {
   login,
   signup,
 } from '@/modules/auth/services/auth.service';
-import type { RouteHandler } from '@/core/router/router';
 
-export const signupHandler: RouteHandler = async (req) => {
+export const signupHandler = async (req: Request) => {
   const body = await parseJsonBody<unknown>(req);
   const input = signupSchema.parse(body);
   const result = await signup(input);
@@ -20,7 +19,7 @@ export const signupHandler: RouteHandler = async (req) => {
   return jsonResponse(result, 201);
 };
 
-export const loginHandler: RouteHandler = async (req) => {
+export const loginHandler = async (req: Request) => {
   const body = await parseJsonBody<unknown>(req);
   const input = loginSchema.parse(body);
   const result = await login(input);
@@ -28,9 +27,8 @@ export const loginHandler: RouteHandler = async (req) => {
   return jsonResponse(result);
 };
 
-export const meHandler: RouteHandler = async (req) => {
-  const { userId } = authenticate(req);
-  const user = await getAuthenticatedUser(userId);
+export const meHandler = withAuth(async (_req, _params, auth) => {
+  const user = await getAuthenticatedUser(auth.userId);
 
   return jsonResponse(user);
-};
+});
