@@ -13,5 +13,23 @@ export type LoginInput = {
 
 export type AuthResponse = {
   user: UserResponse;
+  accessToken: string;
+  refreshToken: string;
+  /** @deprecated Use accessToken */
   token: string;
+};
+
+export type RefreshInput = {
+  refreshToken: string;
+};
+
+export type LogoutInput = {
+  refreshToken?: string;
+};
+
+export type UpdateProfileInput = {
+  name?: string;
+  email?: string;
+  currentPassword?: string;
+  newPassword?: string;
 };

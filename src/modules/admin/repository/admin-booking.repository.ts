@@ -1,0 +1,394 @@
+import { sql } from '@/database/postgres';
+import type {
+  AdminBookingRecord,
+  BookingsReport,
+  BookingsReportFilters,
+  ListBookingsFilters,
+  OccupancyReport,
+  OccupancyReportFilters,
+  RevenueByDate,
+  RevenueByMovie,
+  RevenueReport,
+  RevenueReportFilters,
+} from '@/modules/admin/types/admin.types';
+
+type AdminBookingRow = {
+  booking_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  showtime_id: string;
+  movie_title: string;
+  hall_name: string;
+  theatre_name: string;
+  start_time: Date;
+  ticket_price: string;
+  status: string;
+  refund_status: string;
+  paid_amount: string;
+  cancelled_at: Date | null;
+  created_at: Date;
+  seat_id: string | null;
+  seat_number: number | null;
+};
+
+function groupBookingRows(rows: AdminBookingRow[]): AdminBookingRecord[] {
+  const bookings = new Map<string, AdminBookingRecord>();
+
+  for (const row of rows) {
+    const ticketPrice = Number(row.ticket_price);
+    const existing = bookings.get(row.booking_id);
+
+    if (!existing) {
+      bookings.set(row.booking_id, {
+        id: row.booking_id,
+        userId: row.user_id,
+        userName: row.user_name,
+        userEmail: row.user_email,
+        showtimeId: row.showtime_id,
+        movieTitle: row.movie_title,
+        hallName: row.hall_name,
+        theatreName: row.theatre_name,
+        startTime: row.start_time,
+        status: row.status,
+        refundStatus: row.refund_status,
+        paidAmount: Number(row.paid_amount),
+        cancelledAt: row.cancelled_at,
+        seatCount: row.seat_id ? 1 : 0,
+        ticketPrice,
+        totalAmount: row.seat_id ? ticketPrice : Number(row.paid_amount),
+        seats: row.seat_id && row.seat_number
+          ? [{ id: row.seat_id, seatNumber: row.seat_number }]
+          : [],
+        createdAt: row.created_at,
+      });
+      continue;
+    }
+
+    if (row.seat_id && row.seat_number) {
+      existing.seats.push({ id: row.seat_id, seatNumber: row.seat_number });
+      existing.seatCount += 1;
+      existing.totalAmount += ticketPrice;
+    }
+  }
+
+  return [...bookings.values()];
+}
+
+export async function findAllBookings(
+  filters: ListBookingsFilters,
+): Promise<{ bookings: AdminBookingRecord[]; total: number }> {
+  const offset = (filters.page - 1) * filters.limit;
+  const userId = filters.userId ?? null;
+  const showtimeId = filters.showtimeId ?? null;
+  const from = filters.from ?? null;
+  const to = filters.to ?? null;
+
+  const [countRow] = await sql<{ count: string }[]>`
+    SELECT COUNT(DISTINCT mb.id)::text AS count
+    FROM movie_bookings mb
+    WHERE (${userId}::uuid IS NULL OR mb.user_id = ${userId})
+      AND (${showtimeId}::uuid IS NULL OR mb.showtime_id = ${showtimeId})
+      AND (${from}::timestamptz IS NULL OR mb.created_at >= ${from})
+      AND (${to}::timestamptz IS NULL OR mb.created_at <= ${to})
+  `;
+
+  const rows = await sql<AdminBookingRow[]>`
+    SELECT
+      mb.id AS booking_id,
+      u.id AS user_id,
+      u.name AS user_name,
+      u.email AS user_email,
+      st.id AS showtime_id,
+      m.title AS movie_title,
+      h.name AS hall_name,
+      t.name AS theatre_name,
+      st.start_time,
+      st.ticket_price::text AS ticket_price,
+      mb.status,
+      mb.refund_status,
+      mb.paid_amount::text AS paid_amount,
+      mb.cancelled_at,
+      mb.created_at,
+      se.id AS seat_id,
+      se.seat_number
+    FROM movie_bookings mb
+    JOIN users u ON u.id = mb.user_id
+    JOIN showtimes st ON st.id = mb.showtime_id
+    JOIN movies m ON m.id = st.movie_id
+    JOIN halls h ON h.id = st.hall_id
+    JOIN theatres t ON t.id = h.theatre_id
+    LEFT JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    LEFT JOIN seats se ON se.id = mbs.seat_id
+    WHERE (${userId}::uuid IS NULL OR mb.user_id = ${userId})
+      AND (${showtimeId}::uuid IS NULL OR mb.showtime_id = ${showtimeId})
+      AND (${from}::timestamptz IS NULL OR mb.created_at >= ${from})
+      AND (${to}::timestamptz IS NULL OR mb.created_at <= ${to})
+    ORDER BY mb.created_at DESC, se.seat_number ASC NULLS LAST
+    LIMIT ${filters.limit}
+    OFFSET ${offset}
+  `;
+
+  return {
+    bookings: groupBookingRows(rows),
+    total: Number(countRow?.count ?? 0),
+  };
+}
+
+export async function findAdminBookingById(
+  bookingId: string,
+): Promise<AdminBookingRecord | null> {
+  const rows = await sql<AdminBookingRow[]>`
+    SELECT
+      mb.id AS booking_id,
+      u.id AS user_id,
+      u.name AS user_name,
+      u.email AS user_email,
+      st.id AS showtime_id,
+      m.title AS movie_title,
+      h.name AS hall_name,
+      t.name AS theatre_name,
+      st.start_time,
+      st.ticket_price::text AS ticket_price,
+      mb.status,
+      mb.refund_status,
+      mb.paid_amount::text AS paid_amount,
+      mb.cancelled_at,
+      mb.created_at,
+      se.id AS seat_id,
+      se.seat_number
+    FROM movie_bookings mb
+    JOIN users u ON u.id = mb.user_id
+    JOIN showtimes st ON st.id = mb.showtime_id
+    JOIN movies m ON m.id = st.movie_id
+    JOIN halls h ON h.id = st.hall_id
+    JOIN theatres t ON t.id = h.theatre_id
+    LEFT JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    LEFT JOIN seats se ON se.id = mbs.seat_id
+    WHERE mb.id = ${bookingId}
+    ORDER BY se.seat_number ASC NULLS LAST
+  `;
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return groupBookingRows(rows)[0] ?? null;
+}
+
+export async function getRevenueReport(
+  filters: RevenueReportFilters,
+): Promise<RevenueReport> {
+  const from = filters.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const to = filters.to ?? new Date();
+
+  const [summary] = await sql<
+    {
+      total_bookings: string;
+      total_seats: string;
+      total_revenue: string;
+    }[]
+  >`
+    SELECT
+      COUNT(DISTINCT mb.id)::text AS total_bookings,
+      COUNT(mbs.id)::text AS total_seats,
+      COALESCE(SUM(st.ticket_price), 0)::text AS total_revenue
+    FROM movie_bookings mb
+    JOIN showtimes st ON st.id = mb.showtime_id
+    JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    WHERE mb.status = 'confirmed'
+      AND mb.created_at >= ${from}
+      AND mb.created_at <= ${to}
+  `;
+
+  const byMovie = await sql<
+    {
+      movie_id: string;
+      movie_title: string;
+      booking_count: string;
+      seats_sold: string;
+      revenue: string;
+    }[]
+  >`
+    SELECT
+      m.id AS movie_id,
+      m.title AS movie_title,
+      COUNT(DISTINCT mb.id)::text AS booking_count,
+      COUNT(mbs.id)::text AS seats_sold,
+      COALESCE(SUM(st.ticket_price), 0)::text AS revenue
+    FROM movie_bookings mb
+    JOIN showtimes st ON st.id = mb.showtime_id
+    JOIN movies m ON m.id = st.movie_id
+    JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    WHERE mb.status = 'confirmed'
+      AND mb.created_at >= ${from}
+      AND mb.created_at <= ${to}
+    GROUP BY m.id, m.title
+    ORDER BY revenue DESC
+  `;
+
+  const byDate = await sql<
+    {
+      date: string;
+      booking_count: string;
+      seats_sold: string;
+      revenue: string;
+    }[]
+  >`
+    SELECT
+      DATE(mb.created_at)::text AS date,
+      COUNT(DISTINCT mb.id)::text AS booking_count,
+      COUNT(mbs.id)::text AS seats_sold,
+      COALESCE(SUM(st.ticket_price), 0)::text AS revenue
+    FROM movie_bookings mb
+    JOIN showtimes st ON st.id = mb.showtime_id
+    JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    WHERE mb.status = 'confirmed'
+      AND mb.created_at >= ${from}
+      AND mb.created_at <= ${to}
+    GROUP BY DATE(mb.created_at)
+    ORDER BY date ASC
+  `;
+
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    totalBookings: Number(summary?.total_bookings ?? 0),
+    totalSeatsSold: Number(summary?.total_seats ?? 0),
+    totalRevenue: Number(summary?.total_revenue ?? 0),
+    byMovie: byMovie.map(
+      (row): RevenueByMovie => ({
+        movieId: row.movie_id,
+        movieTitle: row.movie_title,
+        bookingCount: Number(row.booking_count),
+        seatsSold: Number(row.seats_sold),
+        revenue: Number(row.revenue),
+      }),
+    ),
+    byDate: byDate.map(
+      (row): RevenueByDate => ({
+        date: row.date,
+        bookingCount: Number(row.booking_count),
+        seatsSold: Number(row.seats_sold),
+        revenue: Number(row.revenue),
+      }),
+    ),
+  };
+}
+
+export async function getOccupancyReport(
+  filters: OccupancyReportFilters,
+): Promise<OccupancyReport> {
+  const movieId = filters.movieId ?? null;
+  const from = filters.from ?? null;
+  const to = filters.to ?? null;
+
+  const rows = await sql<
+    {
+      showtime_id: string;
+      movie_id: string;
+      movie_title: string;
+      hall_name: string;
+      start_time: Date;
+      total_seats: number;
+      booked_seats: string;
+    }[]
+  >`
+    SELECT
+      st.id AS showtime_id,
+      m.id AS movie_id,
+      m.title AS movie_title,
+      h.name AS hall_name,
+      st.start_time,
+      h.capacity AS total_seats,
+      COUNT(mbs.id)::text AS booked_seats
+    FROM showtimes st
+    JOIN movies m ON m.id = st.movie_id
+    JOIN halls h ON h.id = st.hall_id
+    LEFT JOIN movie_bookings mb
+      ON mb.showtime_id = st.id
+      AND mb.status = 'confirmed'
+    LEFT JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    WHERE (${movieId}::uuid IS NULL OR m.id = ${movieId})
+      AND (${from}::timestamptz IS NULL OR st.start_time >= ${from})
+      AND (${to}::timestamptz IS NULL OR st.start_time <= ${to})
+    GROUP BY st.id, m.id, m.title, h.name, st.start_time, h.capacity
+    ORDER BY st.start_time ASC
+  `;
+
+  return {
+    from: from?.toISOString() ?? null,
+    to: to?.toISOString() ?? null,
+    movieId,
+    items: rows.map((row) => {
+      const bookedSeats = Number(row.booked_seats);
+      const totalSeats = row.total_seats;
+
+      return {
+        showtimeId: row.showtime_id,
+        movieId: row.movie_id,
+        movieTitle: row.movie_title,
+        hallName: row.hall_name,
+        startTime: row.start_time,
+        totalSeats,
+        bookedSeats,
+        fillPercentage:
+          totalSeats > 0
+            ? Math.round((bookedSeats / totalSeats) * 10000) / 100
+            : 0,
+      };
+    }),
+  };
+}
+
+function bookingsReportTrunc(groupBy: BookingsReportFilters['groupBy']): string {
+  switch (groupBy) {
+    case 'week':
+      return 'week';
+    case 'month':
+      return 'month';
+    default:
+      return 'day';
+  }
+}
+
+export async function getBookingsReport(
+  filters: BookingsReportFilters,
+): Promise<BookingsReport> {
+  const from = filters.from ?? null;
+  const to = filters.to ?? null;
+  const userId = filters.userId ?? null;
+  const movieId = filters.movieId ?? null;
+  const trunc = bookingsReportTrunc(filters.groupBy);
+
+  const rows = await sql<
+    { period: Date; booking_count: string; seats_sold: string }[]
+  >`
+    SELECT
+      DATE_TRUNC(${trunc}, mb.created_at) AS period,
+      COUNT(DISTINCT mb.id)::text AS booking_count,
+      COUNT(mbs.id)::text AS seats_sold
+    FROM movie_bookings mb
+    JOIN showtimes st ON st.id = mb.showtime_id
+    JOIN movies m ON m.id = st.movie_id
+    LEFT JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
+    WHERE mb.status = 'confirmed'
+      AND (${from}::timestamptz IS NULL OR mb.created_at >= ${from})
+      AND (${to}::timestamptz IS NULL OR mb.created_at <= ${to})
+      AND (${userId}::uuid IS NULL OR mb.user_id = ${userId})
+      AND (${movieId}::uuid IS NULL OR m.id = ${movieId})
+    GROUP BY DATE_TRUNC(${trunc}, mb.created_at)
+    ORDER BY period ASC
+  `;
+
+  return {
+    from: from?.toISOString() ?? null,
+    to: to?.toISOString() ?? null,
+    groupBy: filters.groupBy,
+    periods: rows.map((row) => ({
+      period: row.period.toISOString(),
+      bookingCount: Number(row.booking_count),
+      seatsSold: Number(row.seats_sold),
+    })),
+  };
+}

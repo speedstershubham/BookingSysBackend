@@ -17,6 +17,9 @@ function mapPublicRow(row: UserPublicRow): UserPublicRecord {
     id: row.id,
     name: row.name,
     email: row.email,
+    role: row.role,
+    isBanned: row.is_banned,
+    bannedAt: row.banned_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -99,4 +102,45 @@ export async function findUsers(
     users: users.map(mapPublicRow),
     total,
   };
+}
+
+export async function findUserAuthById(
+  id: string,
+): Promise<UserAuthRecord | null> {
+  const [user] = await sql<UserAuthRow[]>`
+    SELECT ${sql.unsafe(USER_AUTH_COLUMNS)}
+    FROM users
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+
+  return user ? mapAuthRow(user) : null;
+}
+
+export async function updateUserProfile(
+  id: string,
+  input: { name?: string; email?: string; password?: string },
+): Promise<UserPublicRecord | null> {
+  const existing = await findUserAuthById(id);
+
+  if (!existing) {
+    return null;
+  }
+
+  const name = input.name ?? existing.name;
+  const email = input.email ?? existing.email;
+  const password = input.password ?? existing.password;
+
+  const [user] = await sql<UserPublicRow[]>`
+    UPDATE users
+    SET
+      name = ${name},
+      email = ${email},
+      password = ${password},
+      updated_at = ${new Date()}
+    WHERE id = ${id}
+    RETURNING ${sql.unsafe(USER_PUBLIC_COLUMNS)}
+  `;
+
+  return user ? mapPublicRow(user) : null;
 }

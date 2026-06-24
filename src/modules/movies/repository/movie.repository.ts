@@ -1,13 +1,15 @@
 import { sql } from '@/database/postgres';
 import type { PaginationParams } from '@/core/types/pagination';
 import type {
+  CreateMovieInput,
+  HallRecord,
   HallSummary,
   MovieRecord,
   MovieRow,
   MovieWithShowtimes,
-  SeatRecord,
-  SeatRow,
-  ShowtimeSeatsResponse,
+  ShowtimeDetailResponse,
+  ShowtimeRecord,
+  UpdateMovieInput,
 } from '@/modules/movies/types/movie.types';
 
 function mapMovieRow(row: MovieRow): MovieRecord {
@@ -81,6 +83,17 @@ export async function findMovieById(
     return null;
   }
 
+  const showtimes = await findShowtimesByMovieId(id);
+
+  return {
+    ...mapMovieRow(movie),
+    showtimes,
+  };
+}
+
+export async function findShowtimesByMovieId(
+  movieId: string,
+): Promise<HallSummary[]> {
   const showtimes = await sql<ShowtimeJoinRow[]>`
     SELECT
       s.id AS showtime_id,
@@ -91,44 +104,137 @@ export async function findMovieById(
       s.end_time
     FROM showtimes s
     JOIN halls h ON h.id = s.hall_id
-    WHERE s.movie_id = ${id}
+    WHERE s.movie_id = ${movieId}
     ORDER BY s.start_time ASC
   `;
 
+  return showtimes.map(mapShowtimeRow);
+}
+
+export async function insertMovie(
+  input: CreateMovieInput,
+): Promise<MovieRecord> {
+  const now = new Date();
+  const [movie] = await sql<MovieRow[]>`
+    INSERT INTO movies (title, description, duration_minutes, genre, rating, created_at, updated_at)
+    VALUES (
+      ${input.title},
+      ${input.description},
+      ${input.durationMinutes},
+      ${input.genre},
+      ${input.rating},
+      ${now},
+      ${now}
+    )
+    RETURNING id, title, description, duration_minutes, genre, rating, created_at, updated_at
+  `;
+
+  if (!movie) {
+    throw new Error('Failed to create movie');
+  }
+
+  return mapMovieRow(movie);
+}
+
+export async function updateMovieById(
+  id: string,
+  input: UpdateMovieInput,
+): Promise<MovieRecord | null> {
+  const [existing] = await sql<MovieRow[]>`
+    SELECT id, title, description, duration_minutes, genre, rating, created_at, updated_at
+    FROM movies
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+
+  if (!existing) {
+    return null;
+  }
+
+  const [movie] = await sql<MovieRow[]>`
+    UPDATE movies
+    SET
+      title = ${input.title ?? existing.title},
+      description = ${input.description ?? existing.description},
+      duration_minutes = ${input.durationMinutes ?? existing.duration_minutes},
+      genre = ${input.genre ?? existing.genre},
+      rating = ${input.rating ?? existing.rating},
+      updated_at = ${new Date()}
+    WHERE id = ${id}
+    RETURNING id, title, description, duration_minutes, genre, rating, created_at, updated_at
+  `;
+
+  return movie ? mapMovieRow(movie) : null;
+}
+
+export async function deleteMovieById(id: string): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM movies WHERE id = ${id}
+  `;
+
+  return result.count > 0;
+}
+
+export async function findHallById(id: string): Promise<HallRecord | null> {
+  const [hall] = await sql<{ id: string; name: string; capacity: number }[]>`
+    SELECT id, name, capacity FROM halls WHERE id = ${id} LIMIT 1
+  `;
+
+  return hall ?? null;
+}
+
+export async function insertShowtime(
+  movieId: string,
+  hallId: string,
+  startTime: Date,
+  endTime: Date,
+  ticketPrice = 500,
+): Promise<ShowtimeRecord> {
+  const [showtime] = await sql<
+    {
+      id: string;
+      movie_id: string;
+      hall_id: string;
+      start_time: Date;
+      end_time: Date;
+      ticket_price: string;
+    }[]
+  >`
+    INSERT INTO showtimes (movie_id, hall_id, start_time, end_time, ticket_price)
+    VALUES (${movieId}, ${hallId}, ${startTime}, ${endTime}, ${ticketPrice})
+    RETURNING id, movie_id, hall_id, start_time, end_time, ticket_price
+  `;
+
+  if (!showtime) {
+    throw new Error('Failed to create showtime');
+  }
+
   return {
-    ...mapMovieRow(movie),
-    showtimes: showtimes.map(mapShowtimeRow),
+    id: showtime.id,
+    movieId: showtime.movie_id,
+    hallId: showtime.hall_id,
+    startTime: showtime.start_time,
+    endTime: showtime.end_time,
+    ticketPrice: Number(showtime.ticket_price),
   };
 }
 
-export async function   findShowtimeSeats(
-  showtimeId: string,
-): Promise<ShowtimeSeatsResponse | null> {
+export async function findShowtimeById(
+  id: string,
+): Promise<ShowtimeRecord | null> {
   const [showtime] = await sql<
     {
-      showtime_id: string;
+      id: string;
       movie_id: string;
-      movie_title: string;
       hall_id: string;
-      hall_name: string;
-      capacity: number;
       start_time: Date;
       end_time: Date;
+      ticket_price: string;
     }[]
   >`
-    SELECT
-      s.id AS showtime_id,
-      m.id AS movie_id,
-      m.title AS movie_title,
-      h.id AS hall_id,
-      h.name AS hall_name,
-      h.capacity,
-      s.start_time,
-      s.end_time
-    FROM showtimes s
-    JOIN movies m ON m.id = s.movie_id
-    JOIN halls h ON h.id = s.hall_id
-    WHERE s.id = ${showtimeId}
+    SELECT id, movie_id, hall_id, start_time, end_time, ticket_price
+    FROM showtimes
+    WHERE id = ${id}
     LIMIT 1
   `;
 
@@ -136,23 +242,55 @@ export async function   findShowtimeSeats(
     return null;
   }
 
-  const seats = await sql<SeatRow[]>`
+  return {
+    id: showtime.id,
+    movieId: showtime.movie_id,
+    hallId: showtime.hall_id,
+    startTime: showtime.start_time,
+    endTime: showtime.end_time,
+    ticketPrice: Number(showtime.ticket_price),
+  };
+}
+
+export async function findShowtimeDetailById(
+  id: string,
+): Promise<ShowtimeDetailResponse | null> {
+  const [showtime] = await sql<
+    {
+      id: string;
+      movie_id: string;
+      movie_title: string;
+      hall_id: string;
+      hall_name: string;
+      capacity: number;
+      start_time: Date;
+      end_time: Date;
+      ticket_price: string;
+    }[]
+  >`
     SELECT
-      se.id,
-      se.seat_number,
-      NOT EXISTS (
-        SELECT 1
-        FROM movie_booking_seats mbs
-        WHERE mbs.showtime_id = ${showtimeId}
-          AND mbs.seat_id = se.id
-      ) AS is_available
-    FROM seats se
-    WHERE se.hall_id = ${showtime.hall_id}
-    ORDER BY se.seat_number ASC
+      s.id,
+      s.movie_id,
+      m.title AS movie_title,
+      s.hall_id,
+      h.name AS hall_name,
+      h.capacity,
+      s.start_time,
+      s.end_time,
+      s.ticket_price
+    FROM showtimes s
+    JOIN movies m ON m.id = s.movie_id
+    JOIN halls h ON h.id = s.hall_id
+    WHERE s.id = ${id}
+    LIMIT 1
   `;
 
+  if (!showtime) {
+    return null;
+  }
+
   return {
-    showtimeId: showtime.showtime_id,
+    id: showtime.id,
     movieId: showtime.movie_id,
     movieTitle: showtime.movie_title,
     hallId: showtime.hall_id,
@@ -160,161 +298,80 @@ export async function   findShowtimeSeats(
     capacity: showtime.capacity,
     startTime: showtime.start_time,
     endTime: showtime.end_time,
-    seats: seats.map(
-      (seat): SeatRecord => ({
-        id: seat.id,
-        seatNumber: seat.seat_number,
-        isAvailable: seat.is_available,
-      }),
-    ),
+    ticketPrice: Number(showtime.ticket_price),
   };
 }
 
-export async function findShowtimeHallId(
+export async function countShowtimeBookings(
   showtimeId: string,
-): Promise<string | null> {
-  const [row] = await sql<{ hall_id: string }[]>`
-    SELECT hall_id FROM showtimes WHERE id = ${showtimeId} LIMIT 1
+): Promise<number> {
+  const [row] = await sql<{ count: string }[]>`
+    SELECT COUNT(*)::text AS count
+    FROM movie_bookings
+    WHERE showtime_id = ${showtimeId}
+      AND status = 'confirmed'
   `;
 
-  return row?.hall_id ?? null;
+  return Number(row?.count ?? 0);
 }
 
-export async function findSeatsForShowtime(
-  showtimeId: string,
-  seatIds: string[],
-): Promise<{ id: string; seat_number: number; hall_id: string }[]> {
-  if (seatIds.length === 0) {
-    return [];
+export async function updateShowtimeById(
+  id: string,
+  input: {
+    hallId: string;
+    startTime: Date;
+    endTime: Date;
+    ticketPrice: number;
+  },
+): Promise<ShowtimeRecord | null> {
+  const [showtime] = await sql<
+    {
+      id: string;
+      movie_id: string;
+      hall_id: string;
+      start_time: Date;
+      end_time: Date;
+      ticket_price: string;
+    }[]
+  >`
+    UPDATE showtimes
+    SET
+      hall_id = ${input.hallId},
+      start_time = ${input.startTime},
+      end_time = ${input.endTime},
+      ticket_price = ${input.ticketPrice}
+    WHERE id = ${id}
+    RETURNING id, movie_id, hall_id, start_time, end_time, ticket_price
+  `;
+
+  if (!showtime) {
+    return null;
   }
 
-  return sql`
-    SELECT se.id, se.seat_number, se.hall_id
-    FROM seats se
-    JOIN showtimes st ON st.hall_id = se.hall_id
-    WHERE st.id = ${showtimeId}
-      AND se.id IN ${sql(seatIds)}
-  `;
+  return {
+    id: showtime.id,
+    movieId: showtime.movie_id,
+    hallId: showtime.hall_id,
+    startTime: showtime.start_time,
+    endTime: showtime.end_time,
+    ticketPrice: Number(showtime.ticket_price),
+  };
 }
 
-export async function createMovieBooking(
-  userId: string,
-  showtimeId: string,
-  seatIds: string[],
-): Promise<string> {
-  return sql.begin(async (tx) => {
-    const seats = await tx`
-      SELECT se.id
-      FROM seats se
-      JOIN showtimes st ON st.hall_id = se.hall_id
-      WHERE st.id = ${showtimeId}
-        AND se.id IN ${sql(seatIds)}
-    `;
+export async function deleteShowtimeById(id: string): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM showtimes WHERE id = ${id}
+  `;
 
-    if (seats.length !== seatIds.length) {
-      throw new Error('INVALID_SEATS');
-    }
-
-    const booked = await tx`
-      SELECT seat_id
-      FROM movie_booking_seats
-      WHERE showtime_id = ${showtimeId}
-        AND seat_id IN ${sql(seatIds)}
-    `;
-
-    if (booked.length > 0) {
-      throw new Error('SEATS_UNAVAILABLE');
-    }
-
-    const [booking] = await tx<{ id: string }[]>`
-      INSERT INTO movie_bookings (user_id, showtime_id)
-      VALUES (${userId}, ${showtimeId})
-      RETURNING id
-    `;
-
-    if (!booking) {
-      throw new Error('BOOKING_FAILED');
-    }
-
-    for (const seatId of seatIds) {
-      await tx`
-        INSERT INTO movie_booking_seats (booking_id, showtime_id, seat_id)
-        VALUES (${booking.id}, ${showtimeId}, ${seatId})
-      `;
-    }
-
-    return booking.id;
-  });
+  return result.count > 0;
 }
 
-export async function findUserBookings(
-  userId: string,
-): Promise<
-  {
-    booking_id: string;
-    showtime_id: string;
-    movie_title: string;
-    hall_name: string;
-    start_time: Date;
-    created_at: Date;
-    seat_id: string;
-    seat_number: number;
-  }[]
-> {
-  return sql`
-    SELECT
-      mb.id AS booking_id,
-      st.id AS showtime_id,
-      m.title AS movie_title,
-      h.name AS hall_name,
-      st.start_time,
-      mb.created_at,
-      se.id AS seat_id,
-      se.seat_number
-    FROM movie_bookings mb
-    JOIN showtimes st ON st.id = mb.showtime_id
-    JOIN movies m ON m.id = st.movie_id
-    JOIN halls h ON h.id = st.hall_id
-    JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
-    JOIN seats se ON se.id = mbs.seat_id
-    WHERE mb.user_id = ${userId}
-    ORDER BY mb.created_at DESC, se.seat_number ASC
+export async function findMovieDurationMinutes(
+  id: string,
+): Promise<number | null> {
+  const [row] = await sql<{ duration_minutes: number }[]>`
+    SELECT duration_minutes FROM movies WHERE id = ${id} LIMIT 1
   `;
-}
 
-export async function findBookingById(
-  bookingId: string,
-  userId: string,
-): Promise<
-  {
-    booking_id: string;
-    showtime_id: string;
-    movie_title: string;
-    hall_name: string;
-    start_time: Date;
-    created_at: Date;
-    seat_id: string;
-    seat_number: number;
-  }[]
-> {
-  return sql`
-    SELECT
-      mb.id AS booking_id,
-      st.id AS showtime_id,
-      m.title AS movie_title,
-      h.name AS hall_name,
-      st.start_time,
-      mb.created_at,
-      se.id AS seat_id,
-      se.seat_number
-    FROM movie_bookings mb
-    JOIN showtimes st ON st.id = mb.showtime_id
-    JOIN movies m ON m.id = st.movie_id
-    JOIN halls h ON h.id = st.hall_id
-    JOIN movie_booking_seats mbs ON mbs.booking_id = mb.id
-    JOIN seats se ON se.id = mbs.seat_id
-    WHERE mb.id = ${bookingId}
-      AND mb.user_id = ${userId}
-    ORDER BY se.seat_number ASC
-  `;
+  return row?.duration_minutes ?? null;
 }

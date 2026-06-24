@@ -6,19 +6,33 @@ import {
   type PaginationParams,
 } from '@/core/types/pagination';
 import {
-  createMovieBooking,
-  findBookingById,
+  deleteMovieById,
+  deleteShowtimeById,
+  findHallById,
   findMovieById,
+  findMovieDurationMinutes,
   findMovies,
-  findShowtimeSeats,
-  findUserBookings,
+  findShowtimeById,
+  findShowtimeDetailById,
+  findShowtimesByMovieId,
+  insertMovie,
+  insertShowtime,
+  countShowtimeBookings,
+  updateMovieById,
+  updateShowtimeById,
 } from '@/modules/movies/repository/movie.repository';
 import type {
-  BookingRecord,
-  CreateBookingInput,
+  HallRecord,
+  CreateMovieInput,
+  CreateShowtimeInput,
+  HallSummary,
   MovieDetailResponse,
+  MovieRecord,
   MovieResponse,
-  ShowtimeSeatsResponse,
+  ShowtimeDetailResponse,
+  ShowtimeRecord,
+  UpdateMovieInput,
+  UpdateShowtimeInput,
 } from '@/modules/movies/types/movie.types';
 
 export async function getMovies(
@@ -44,10 +58,17 @@ export async function getMovieById(
   return movie;
 }
 
-export async function getShowtimeSeats(
-  showtimeId: string,
-): Promise<ShowtimeSeatsResponse> {
-  const showtime = await findShowtimeSeats(showtimeId);
+export async function getShowtimesByMovieId(
+  movieId: string,
+): Promise<HallSummary[]> {
+  await getMovieById(movieId);
+  return findShowtimesByMovieId(movieId);
+}
+
+export async function getShowtimeById(
+  id: string,
+): Promise<ShowtimeRecord> {
+  const showtime = await findShowtimeById(id);
 
   if (!showtime) {
     throw new AppError(404, 'Showtime not found');
@@ -56,139 +77,189 @@ export async function getShowtimeSeats(
   return showtime;
 }
 
-export async function createBooking(
-  userId: string,
-  input: CreateBookingInput,
-): Promise<BookingRecord> {
-  const uniqueSeatIds = [...new Set(input.seatIds)];
+export async function getHallById(id: string): Promise<HallRecord> {
+  const hall = await findHallById(id);
 
-  if (uniqueSeatIds.length !== input.seatIds.length) {
-    throw new AppError(400, 'Duplicate seats are not allowed');
+  if (!hall) {
+    throw new AppError(404, 'Hall not found');
   }
 
-  const showtime = await findShowtimeSeats(input.showtimeId);
+  return hall;
+}
+
+export async function getShowtimeDetail(
+  id: string,
+): Promise<ShowtimeDetailResponse> {
+  const showtime = await findShowtimeDetailById(id);
 
   if (!showtime) {
     throw new AppError(404, 'Showtime not found');
   }
 
-  const unavailableSeats = showtime.seats.filter(
-    (seat) =>
-      input.seatIds.includes(seat.id) && !seat.isAvailable,
-  );
+  return showtime;
+}
 
-  if (unavailableSeats.length > 0) {
-    throw new AppError(
-      409,
-      `Seats already booked: ${unavailableSeats.map((s) => s.seatNumber).join(', ')}`,
-    );
+export async function createMovie(
+  input: CreateMovieInput,
+): Promise<MovieRecord> {
+  return insertMovie(input);
+}
+
+export async function updateMovie(
+  id: string,
+  input: UpdateMovieInput,
+): Promise<MovieRecord> {
+  const movie = await updateMovieById(id, input);
+
+  if (!movie) {
+    throw new AppError(404, 'Movie not found');
+  }
+
+  return movie;
+}
+
+export async function deleteMovie(id: string): Promise<void> {
+  const deleted = await deleteMovieById(id);
+
+  if (!deleted) {
+    throw new AppError(404, 'Movie not found');
+  }
+}
+
+export async function createShowtime(
+  input: CreateShowtimeInput,
+): Promise<ShowtimeRecord> {
+  const movie = await findMovieById(input.movieId);
+
+  if (!movie) {
+    throw new AppError(404, 'Movie not found');
+  }
+
+  const hall = await findHallById(input.hallId);
+
+  if (!hall) {
+    throw new AppError(404, 'Hall not found');
+  }
+
+  const endTime =
+    input.endTime ??
+    new Date(input.startTime.getTime() + movie.durationMinutes * 60_000);
+
+  if (endTime <= input.startTime) {
+    throw new AppError(400, 'End time must be after start time');
   }
 
   try {
-    const bookingId = await createMovieBooking(
-      userId,
-      input.showtimeId,
-      input.seatIds,
+    return await insertShowtime(
+      input.movieId,
+      input.hallId,
+      input.startTime,
+      endTime,
+      input.ticketPrice ?? 500,
     );
-
-    const booking = await findBookingById(bookingId, userId);
-
-    if (booking.length === 0) {
-      throw new AppError(500, 'Failed to create booking');
-    }
-
-    return mapBookingRows(booking);
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === 'INVALID_SEATS') {
-        throw new AppError(400, 'One or more seats are invalid for this showtime');
-      }
-
-      if (error.message === 'SEATS_UNAVAILABLE') {
-        throw new AppError(409, 'One or more seats are already booked');
-      }
-    }
-
     if (isUniqueViolation(error)) {
-      throw new AppError(409, 'One or more seats are already booked');
+      throw new AppError(
+        409,
+        'A showtime already exists for this movie, hall, and start time',
+      );
     }
 
     throw error;
   }
 }
 
-export async function getMyBookings(userId: string): Promise<BookingRecord[]> {
-  const rows = await findUserBookings(userId);
-  return groupBookingRows(rows);
-}
-
-function mapBookingRows(
-  rows: {
-    booking_id: string;
-    showtime_id: string;
-    movie_title: string;
-    hall_name: string;
-    start_time: Date;
-    created_at: Date;
-    seat_id: string;
-    seat_number: number;
-  }[],
-): BookingRecord {
-  const first = rows[0];
-
-  if (!first) {
-    throw new AppError(500, 'Failed to load booking');
+export async function updateShowtime(
+  id: string,
+  input: UpdateShowtimeInput,
+): Promise<ShowtimeRecord> {
+  if (Object.keys(input).length === 0) {
+    throw new AppError(400, 'No fields to update');
   }
 
-  return {
-    id: first.booking_id,
-    showtimeId: first.showtime_id,
-    movieTitle: first.movie_title,
-    hallName: first.hall_name,
-    startTime: first.start_time,
-    createdAt: first.created_at,
-    seats: rows.map((row) => ({
-      id: row.seat_id,
-      seatNumber: row.seat_number,
-    })),
-  };
-}
+  const existing = await findShowtimeById(id);
 
-function groupBookingRows(
-  rows: {
-    booking_id: string;
-    showtime_id: string;
-    movie_title: string;
-    hall_name: string;
-    start_time: Date;
-    created_at: Date;
-    seat_id: string;
-    seat_number: number;
-  }[],
-): BookingRecord[] {
-  const bookings = new Map<string, BookingRecord>();
+  if (!existing) {
+    throw new AppError(404, 'Showtime not found');
+  }
 
-  for (const row of rows) {
-    const existing = bookings.get(row.booking_id);
+  const bookingCount = await countShowtimeBookings(id);
 
-    if (!existing) {
-      bookings.set(row.booking_id, {
-        id: row.booking_id,
-        showtimeId: row.showtime_id,
-        movieTitle: row.movie_title,
-        hallName: row.hall_name,
-        startTime: row.start_time,
-        createdAt: row.created_at,
-        seats: [{ id: row.seat_id, seatNumber: row.seat_number }],
-      });
-      continue;
+  if (input.hallId && input.hallId !== existing.hallId) {
+    if (bookingCount > 0) {
+      throw new AppError(
+        409,
+        'Cannot change hall for a showtime with existing bookings',
+      );
     }
 
-    existing.seats.push({
-      id: row.seat_id,
-      seatNumber: row.seat_number,
-    });
+    const hall = await findHallById(input.hallId);
+
+    if (!hall) {
+      throw new AppError(404, 'Hall not found');
+    }
   }
 
-  return [...bookings.values()];
+  const startTime = input.startTime ?? existing.startTime;
+  let endTime = existing.endTime;
+
+  if (input.startTime) {
+    const durationMinutes = await findMovieDurationMinutes(existing.movieId);
+
+    if (!durationMinutes) {
+      throw new AppError(404, 'Movie not found');
+    }
+
+    endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
+  }
+
+  if (endTime <= startTime) {
+    throw new AppError(400, 'End time must be after start time');
+  }
+
+  const hallId = input.hallId ?? existing.hallId;
+  const ticketPrice = input.ticketPrice ?? existing.ticketPrice;
+
+  try {
+    const showtime = await updateShowtimeById(id, {
+      hallId,
+      startTime,
+      endTime,
+      ticketPrice,
+    });
+
+    if (!showtime) {
+      throw new AppError(404, 'Showtime not found');
+    }
+
+    return showtime;
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new AppError(
+        409,
+        'A showtime already exists for this movie, hall, and start time',
+      );
+    }
+
+    throw error;
+  }
+}
+
+export async function deleteShowtime(id: string): Promise<void> {
+  await getShowtimeById(id);
+
+  const bookingCount = await countShowtimeBookings(id);
+
+  if (bookingCount > 0) {
+    throw new AppError(
+      409,
+      'Cannot delete showtime with existing bookings',
+    );
+  }
+
+  const deleted = await deleteShowtimeById(id);
+
+  if (!deleted) {
+    throw new AppError(404, 'Showtime not found');
+  }
 }

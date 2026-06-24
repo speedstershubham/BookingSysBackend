@@ -7,9 +7,12 @@ const envSchema = z.object({
   PORT: z.string().default('3000'),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   DB_POOL_MAX: z.coerce.number().int().positive().default(20),
   DB_IDLE_TIMEOUT: z.coerce.number().int().positive().default(30),
+  SEAT_LOCK_TTL_MINUTES: z.coerce.number().int().positive().default(10),
 });
 
 export const env = envSchema.parse(process.env);

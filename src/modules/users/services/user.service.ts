@@ -22,6 +22,9 @@ function toUserResponse(user: UserPublicRecord): UserResponse {
     id: user.id,
     name: user.name,
     email: user.email,
+    role: user.role,
+    isBanned: user.isBanned,
+    bannedAt: user.bannedAt,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

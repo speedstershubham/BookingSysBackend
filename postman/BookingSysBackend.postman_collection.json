@@ -2,50 +2,331 @@
   "info": {
     "_postman_id": "booking-sys-backend-collection",
     "name": "BookingSys Backend",
-    "description": "API collection for the Booking System backend.\n\n## Setup\n1. Import this collection into Postman\n2. Ensure `baseUrl` is set (default: `http://localhost:3000`)\n3. Run **Auth → Login** or **Signup** — the token is saved automatically\n4. Use Movies & Bookings requests (they use `{{token}}`)\n\n## Flow\nLogin → List Movies → Get Movie → Get Showtime Seats → Create Booking → My Bookings",
+    "description": "API collection for the Booking System backend.\n\n## Auth (`/api/auth`)\n| Method | Path | Notes |\n|--------|------|-------|\n| POST | /signup, /login | Returns accessToken + refreshToken |\n| POST | /refresh | New access token from refreshToken |\n| POST | /logout | Blacklist access token, revoke refresh |\n| GET/PATCH | /me | Profile read / update |\n\n## Bookings (`/api/bookings`)\n| Method | Path | Notes |\n|--------|------|-------|\n| POST | / | Create booking |\n| GET | /me, /:id | User bookings |\n| PATCH | /:id | Change seats (before showtime) |\n| DELETE | /:id | Cancel (soft-delete, refund pending) |\n\n## Admin (`/api/admin`)\nTheatres, screens, users, bookings, reports (revenue, occupancy, bookings)\n\n## Movies & Showtimes\nUser: GET movies/showtimes · Admin: POST/PATCH/DELETE at `/api/movies`, `/api/showtimes`\n\n## Setup\n1. Import collection + environment\n2. Run **Quick Start** or **Admin → Quick Start**\n3. Use **Auth → Refresh Token** when access token expires (15 min)\n\n## Variables\n`token` (= accessToken), `refreshToken`, `userId`, `targetUserId`, `movieId`, `theatreId`, `hallId`, `showtimeId`, `seatId`, `bookingId`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "variable": [
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
     {
-      "key": "baseUrl",
-      "value": "http://localhost:3000"
-    },
-    {
-      "key": "token",
-      "value": ""
-    },
-    {
-      "key": "userId",
-      "value": ""
-    },
-    {
-      "key": "movieId",
-      "value": ""
-    },
-    {
-      "key": "showtimeId",
-      "value": ""
-    },
-    {
-      "key": "seatId",
-      "value": ""
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const accessToken = pm.collectionVariables.get('accessToken');",
+          "if (accessToken) {",
+          "  pm.collectionVariables.set('token', accessToken);",
+          "  if (pm.environment.get('accessToken') !== accessToken) {",
+          "    pm.environment.set('token', accessToken);",
+          "  }",
+          "}",
+          "const vars = ['token', 'accessToken', 'refreshToken', 'userId', 'targetUserId', 'movieId', 'theatreId', 'hallId', 'showtimeId', 'seatId', 'bookingId'];",
+          "vars.forEach((key) => {",
+          "  const value = pm.collectionVariables.get(key);",
+          "  if (value && pm.environment.get(key) !== value) {",
+          "    pm.environment.set(key, value);",
+          "  }",
+          "});"
+        ]
+      }
     }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "targetUserId", "value": "" },
+    { "key": "movieId", "value": "" },
+    { "key": "theatreId", "value": "" },
+    { "key": "hallId", "value": "" },
+    { "key": "showtimeId", "value": "" },
+    { "key": "seatId", "value": "" },
+    { "key": "bookingId", "value": "" }
   ],
   "item": [
     {
+      "name": "Quick Start",
+      "description": "Run these in order to exercise the full user booking flow. Use Collection Runner with this folder selected.",
+      "item": [
+        {
+          "name": "1. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Returns token', () => pm.expect(json.data.token).to.be.a('string'));",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "  pm.environment.set('token', json.data.token);",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('refreshToken', json.data.refreshToken);",
+                  "  pm.environment.set('userId', json.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. List Movies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Has movies', () => pm.expect(json.data.items.length).to.be.above(0));",
+                  "  pm.collectionVariables.set('movieId', json.data.items[0].id);",
+                  "  pm.environment.set('movieId', json.data.items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "movies"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Movie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Has showtimes', () => pm.expect(json.data.showtimes.length).to.be.above(0));",
+                  "  const st = json.data.showtimes[0];",
+                  "  pm.collectionVariables.set('showtimeId', st.showtimeId);",
+                  "  pm.collectionVariables.set('hallId', st.hallId);",
+                  "  pm.environment.set('showtimeId', st.showtimeId);",
+                  "  pm.environment.set('hallId', st.hallId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "movies", "{{movieId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Get Showtime Seats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  const available = json.data.seats.find((s) => s.status === 'available');",
+                  "  pm.test('Has available seat', () => pm.expect(available).to.exist);",
+                  "  if (available) {",
+                  "    pm.collectionVariables.set('seatId', available.id);",
+                  "    pm.environment.set('seatId', available.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}/seats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "showtimes", "{{showtimeId}}", "seats"]
+            },
+            "description": "Returns seats with `status`: available | locked | booked, and `lockedByMe`."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Update Seat Status (Lock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const seatId = pm.collectionVariables.get('seatId');",
+                  "  const seat = pm.response.json().data.seats.find((s) => s.id === seatId);",
+                  "  pm.test('Seat is locked by me', () => {",
+                  "    pm.expect(seat.status).to.eql('locked');",
+                  "    pm.expect(seat.lockedByMe).to.be.true;",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\"{{seatId}}\"],\n  \"status\": \"locked\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}/seats/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "showtimes", "{{showtimeId}}", "seats", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('bookingId', json.data.id);",
+                  "  pm.environment.set('bookingId', json.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showtimeId\": \"{{showtimeId}}\",\n  \"seatIds\": [\"{{seatId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. Get Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Booking has seats', () => {",
+                  "  pm.expect(pm.response.json().data.seats.length).to.be.above(0);",
+                  "});",
+                  "pm.test('Booking confirmed', () => {",
+                  "  pm.expect(pm.response.json().data.status).to.eql('confirmed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Health",
+      "description": "Public endpoints — no auth required.",
       "item": [
         {
           "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
               "host": ["{{baseUrl}}"],
               "path": ["health"]
-            },
-            "description": "Public health check endpoint."
+            }
           },
           "response": []
         }
@@ -53,6 +334,7 @@
     },
     {
       "name": "Auth",
+      "description": "Authentication — access token (15 min) + refresh token (7 days). Run Login/Signup first.",
       "item": [
         {
           "name": "Signup",
@@ -65,20 +347,22 @@
                   "if (pm.response.code === 201) {",
                   "  const json = pm.response.json();",
                   "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
                   "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "  pm.environment.set('token', json.data.token);",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('refreshToken', json.data.refreshToken);",
+                  "  pm.environment.set('userId', json.data.user.id);",
                   "}"
                 ]
               }
             }
           ],
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
@@ -87,8 +371,7 @@
               "raw": "{{baseUrl}}/api/auth/signup",
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "signup"]
-            },
-            "description": "Register a new user. Saves `token` and `userId` to collection variables on success."
+            }
           },
           "response": []
         },
@@ -103,20 +386,22 @@
                   "if (pm.response.code === 200) {",
                   "  const json = pm.response.json();",
                   "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
                   "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "  pm.environment.set('token', json.data.token);",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('refreshToken', json.data.refreshToken);",
+                  "  pm.environment.set('userId', json.data.user.id);",
                   "}"
                 ]
               }
             }
           ],
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
@@ -125,32 +410,149 @@
               "raw": "{{baseUrl}}/api/auth/login",
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Admin role', () => pm.expect(json.data.user.role).to.eql('admin'));",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "  pm.environment.set('token', json.data.token);",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('refreshToken', json.data.refreshToken);",
+                  "  pm.environment.set('userId', json.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
             },
-            "description": "Login and receive JWT. Saves `token` and `userId` to collection variables on success."
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Use an admin account. Promote via SQL then signup/login."
           },
           "response": []
         },
         {
           "name": "Get Me",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/auth/me",
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated\",\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"newpassword123\"\n}"
             },
-            "description": "Get the authenticated user's profile."
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Update name, email, and/or password. currentPassword required when changing password."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('token', json.data.accessToken);",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('token', json.data.accessToken);",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  ['token', 'accessToken', 'refreshToken'].forEach((key) => {",
+                  "    pm.collectionVariables.unset(key);",
+                  "    pm.environment.unset(key);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Blacklists access token and revokes refresh token."
           },
           "response": []
         }
@@ -158,54 +560,11 @@
     },
     {
       "name": "Users",
+      "description": "Users module — JWT required. Users can only fetch their own profile.",
       "item": [
-        {
-          "name": "List Users",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/users?page=1&limit=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "users"],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
-              ]
-            },
-            "description": "List users with pagination. Requires authentication."
-          },
-          "response": []
-        },
         {
           "name": "Get User By ID",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
@@ -213,7 +572,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users", "{{userId}}"]
             },
-            "description": "Get user by ID. You can only access your own user ID."
+            "description": "Users can only fetch their own profile."
           },
           "response": []
         }
@@ -221,19 +580,144 @@
     },
     {
       "name": "Movies",
+      "description": "Movies & showtimes — user read endpoints. Admin CRUD is under **Admin → Movies & Showtimes**.",
       "item": [
         {
-          "name": "List Movies",
+          "name": "User",
+          "item": [
+            {
+              "name": "List Movies",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  if (json.data.items?.length > 0) {",
+                      "    pm.collectionVariables.set('movieId', json.data.items[0].id);",
+                      "    pm.environment.set('movieId', json.data.items[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/movies?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "movies"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Movie By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  if (json.data.showtimes?.length > 0) {",
+                      "    pm.collectionVariables.set('showtimeId', json.data.showtimes[0].showtimeId);",
+                      "    pm.collectionVariables.set('hallId', json.data.showtimes[0].hallId);",
+                      "    pm.environment.set('showtimeId', json.data.showtimes[0].showtimeId);",
+                      "    pm.environment.set('hallId', json.data.showtimes[0].hallId);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "movies", "{{movieId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Showtimes By Movie",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const showtimes = pm.response.json().data;",
+                      "  if (showtimes?.length > 0) {",
+                      "    pm.collectionVariables.set('showtimeId', showtimes[0].showtimeId);",
+                      "    pm.collectionVariables.set('hallId', showtimes[0].hallId);",
+                      "    pm.environment.set('showtimeId', showtimes[0].showtimeId);",
+                      "    pm.environment.set('hallId', showtimes[0].hallId);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/movies/{{movieId}}/showtimes",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "movies", "{{movieId}}", "showtimes"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Showtime By ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "showtimes", "{{showtimeId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Seats",
+      "description": "Seats module — hall layout and showtime seat status. JWT required.",
+      "item": [
+        {
+          "name": "List Hall Seats",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "if (pm.response.code === 200) {",
                   "  const json = pm.response.json();",
-                  "  if (json.data.items && json.data.items.length > 0) {",
-                  "    pm.collectionVariables.set('movieId', json.data.items[0].id);",
+                  "  if (json.data.seats?.length > 0) {",
+                  "    pm.collectionVariables.set('seatId', json.data.seats[0].id);",
+                  "    pm.environment.set('seatId', json.data.seats[0].id);",
                   "  }",
                   "}"
                 ]
@@ -241,74 +725,22 @@
             }
           ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/movies?page=1&limit=20",
+              "raw": "{{baseUrl}}/api/halls/{{hallId}}/seats",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "movies"],
+              "path": ["api", "halls", "{{hallId}}", "seats"],
               "query": [
                 {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
+                  "key": "showtimeId",
+                  "value": "{{showtimeId}}",
+                  "description": "Optional — include per-showtime status (available | locked | booked)",
+                  "disabled": true
                 }
               ]
             },
-            "description": "List movies with pagination. Saves first `movieId` on success."
-          },
-          "response": []
-        },
-        {
-          "name": "Get Movie By ID",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "  const json = pm.response.json();",
-                  "  if (json.data.showtimes && json.data.showtimes.length > 0) {",
-                  "    pm.collectionVariables.set('showtimeId', json.data.showtimes[0].showtimeId);",
-                  "  }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/movies/{{movieId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "movies", "{{movieId}}"]
-            },
-            "description": "Get movie details with halls and showtimes. Saves first `showtimeId` on success."
+            "description": "List all seats for a theatre/screen (hall). Enable the `showtimeId` query param to include per-showtime status."
           },
           "response": []
         },
@@ -320,11 +752,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "if (pm.response.code === 200) {",
-                  "  const json = pm.response.json();",
-                  "  const available = json.data.seats.find((seat) => seat.isAvailable);",
+                  "  const available = pm.response.json().data.seats.find((s) => s.status === 'available');",
                   "  if (available) {",
                   "    pm.collectionVariables.set('seatId', available.id);",
+                  "    pm.environment.set('seatId', available.id);",
                   "  }",
                   "}"
                 ]
@@ -332,16 +765,6 @@
             }
           ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
@@ -349,7 +772,82 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "showtimes", "{{showtimeId}}", "seats"]
             },
-            "description": "Get all seats for a showtime with availability. Saves first available `seatId` on success."
+            "description": "Seats for a showtime with `status`: available | locked | booked, and `lockedByMe`."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Seat Status (Lock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const seatId = pm.collectionVariables.get('seatId');",
+                  "  const seat = pm.response.json().data.seats.find((s) => s.id === seatId);",
+                  "  if (seat) {",
+                  "    pm.test('Seat locked by me', () => {",
+                  "      pm.expect(seat.status).to.eql('locked');",
+                  "      pm.expect(seat.lockedByMe).to.be.true;",
+                  "    });",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\"{{seatId}}\"],\n  \"status\": \"locked\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}/seats/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "showtimes", "{{showtimeId}}", "seats", "status"]
+            },
+            "description": "Temporarily lock seats during checkout. TTL defaults to 10 minutes (`SEAT_LOCK_TTL_MINUTES`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Seat Status (Unlock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const seatId = pm.collectionVariables.get('seatId');",
+                  "  const seat = pm.response.json().data.seats.find((s) => s.id === seatId);",
+                  "  if (seat) {",
+                  "    pm.test('Seat is available', () => pm.expect(seat.status).to.eql('available'));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\"{{seatId}}\"],\n  \"status\": \"available\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}/seats/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "showtimes", "{{showtimeId}}", "seats", "status"]
+            },
+            "description": "Release your seat locks if the user abandons checkout."
           },
           "response": []
         }
@@ -357,27 +855,28 @@
     },
     {
       "name": "Bookings",
+      "description": "Bookings module — reservations. JWT required. status: confirmed|cancelled · refundStatus: none|pending|completed|not_applicable",
       "item": [
         {
           "name": "Create Booking",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const id = pm.response.json().data.id;",
+                  "  pm.collectionVariables.set('bookingId', id);",
+                  "  pm.environment.set('bookingId', id);",
+                  "}"
+                ]
               }
-            ],
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"showtimeId\": \"{{showtimeId}}\",\n  \"seatIds\": [\"{{seatId}}\"]\n}"
@@ -387,33 +886,924 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "bookings"]
             },
-            "description": "Reserve seats for a showtime. Run List Movies → Get Movie → Get Showtime Seats first to populate variables."
+            "description": "Book available seats or seats you have locked. Run Get Showtime Seats first."
           },
           "response": []
         },
         {
           "name": "My Bookings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const bookings = pm.response.json().data;",
+                  "  if (bookings?.length > 0) {",
+                  "    pm.collectionVariables.set('bookingId', bookings[0].id);",
+                  "    pm.environment.set('bookingId', bookings[0].id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/bookings/me",
               "host": ["{{baseUrl}}"],
               "path": ["api", "bookings", "me"]
-            },
-            "description": "Get all bookings for the authenticated user."
+            }
           },
           "response": []
+        },
+        {
+          "name": "Get Booking By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Booking (Seat Change)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\"{{seatId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            },
+            "description": "Swap seats before showtime starts. Locks new seats then updates booking."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            },
+            "description": "Soft-cancel before showtime starts. Releases seats. Sets refundStatus to pending if paid."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Admin module — `/api/admin/*`. Requires JWT with role=admin.",
+      "item": [
+        {
+          "name": "Quick Start",
+          "description": "Run in order after Admin Login. Uses Collection Runner.",
+          "item": [
+            {
+              "name": "1. Admin Login",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  pm.test('Admin role', () => pm.expect(json.data.user.role).to.eql('admin'));",
+                      "  pm.collectionVariables.set('token', json.data.token);",
+                      "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                      "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                      "  pm.collectionVariables.set('userId', json.data.user.id);",
+                      "  pm.environment.set('token', json.data.token);",
+                      "  pm.environment.set('accessToken', json.data.accessToken);",
+                      "  pm.environment.set('refreshToken', json.data.refreshToken);",
+                      "  pm.environment.set('userId', json.data.user.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "login"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2. List Theatres",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "  const theatres = pm.response.json().data;",
+                      "  if (theatres?.length > 0) {",
+                      "    pm.collectionVariables.set('theatreId', theatres[0].id);",
+                      "    pm.environment.set('theatreId', theatres[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/theatres",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "theatres"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3. List Screens",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "  const items = pm.response.json().data.items;",
+                      "  if (items?.length > 0) {",
+                      "    pm.collectionVariables.set('hallId', items[0].id);",
+                      "    pm.environment.set('hallId', items[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "4. List All Bookings",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "  const items = pm.response.json().data.items;",
+                      "  if (items?.length > 0) {",
+                      "    pm.collectionVariables.set('bookingId', items[0].id);",
+                      "    pm.environment.set('bookingId', items[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/bookings?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "bookings"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "5. Revenue Report",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Has revenue fields', () => {",
+                      "  const d = pm.response.json().data;",
+                      "  pm.expect(d).to.have.property('totalRevenue');",
+                      "  pm.expect(d).to.have.property('byMovie');",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/revenue",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "revenue"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "6. List Users",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "  const me = pm.collectionVariables.get('userId');",
+                      "  const users = pm.response.json().data.items;",
+                      "  const target = users.find((u) => u.id !== me) || users[0];",
+                      "  if (target) {",
+                      "    pm.collectionVariables.set('targetUserId', target.id);",
+                      "    pm.environment.set('targetUserId', target.id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Movies & Showtimes",
+          "description": "Movie/showtime admin CRUD at `/api/movies` and `/api/showtimes` (withAdmin).",
+          "item": [
+            {
+              "name": "Create Movie",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const id = pm.response.json().data.id;",
+                      "  pm.collectionVariables.set('movieId', id);",
+                      "  pm.environment.set('movieId', id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Avatar 3\",\n  \"description\": \"The next chapter in the Avatar saga.\",\n  \"durationMinutes\": 150,\n  \"genre\": \"Sci-Fi\",\n  \"rating\": \"PG-13\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/movies",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "movies"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Movie",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Avatar 3 - Updated\",\n  \"rating\": \"PG-13\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "movies", "{{movieId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Movie",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "movies", "{{movieId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Showtime",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const data = pm.response.json().data;",
+                      "  pm.collectionVariables.set('showtimeId', data.id);",
+                      "  pm.collectionVariables.set('hallId', data.hallId);",
+                      "  pm.environment.set('showtimeId', data.id);",
+                      "  pm.environment.set('hallId', data.hallId);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"movieId\": \"{{movieId}}\",\n  \"hallId\": \"{{hallId}}\",\n  \"startTime\": \"2026-07-01T18:00:00.000Z\",\n  \"ticketPrice\": 500\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/showtimes",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "showtimes"]
+                },
+                "description": "ticketPrice defaults to 500. endTime computed from movie duration if omitted."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Showtime",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticketPrice\": 600,\n  \"startTime\": \"2026-07-01T19:00:00.000Z\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "showtimes", "{{showtimeId}}"]
+                },
+                "description": "Admin only. Hall change blocked if bookings exist. End time recalculated from movie duration when start time changes."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Showtime",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/showtimes/{{showtimeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "showtimes", "{{showtimeId}}"]
+                },
+                "description": "Fails with 409 if showtime has bookings."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Theatres",
+          "item": [
+            {
+              "name": "List Theatres",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const theatres = pm.response.json().data;",
+                      "  if (theatres?.length > 0) {",
+                      "    pm.collectionVariables.set('theatreId', theatres[0].id);",
+                      "    pm.environment.set('theatreId', theatres[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/theatres",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "theatres"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Theatre",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const id = pm.response.json().data.id;",
+                      "  pm.collectionVariables.set('theatreId', id);",
+                      "  pm.environment.set('theatreId', id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"City Multiplex\",\n  \"location\": \"123 Main Street\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/theatres",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "theatres"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Theatre",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const halls = pm.response.json().data.halls;",
+                      "  if (halls?.length > 0) {",
+                      "    pm.collectionVariables.set('hallId', halls[0].id);",
+                      "    pm.environment.set('hallId', halls[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/theatres/{{theatreId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "theatres", "{{theatreId}}"]
+                },
+                "description": "Returns theatre with its screens (halls)."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Theatre",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"location\": \"456 Updated Avenue\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/theatres/{{theatreId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "theatres", "{{theatreId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Theatre",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/theatres/{{theatreId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "theatres", "{{theatreId}}"]
+                },
+                "description": "Fails with 409 if theatre has screens."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Screens & Seats",
+          "item": [
+            {
+              "name": "List Screens (Halls)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const items = pm.response.json().data.items;",
+                      "  if (items?.length > 0) {",
+                      "    pm.collectionVariables.set('hallId', items[0].id);",
+                      "    pm.environment.set('hallId', items[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" },
+                    { "key": "theatreId", "value": "{{theatreId}}", "disabled": true }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Screen (Hall)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const id = pm.response.json().data.id;",
+                      "  pm.collectionVariables.set('hallId', id);",
+                      "  pm.environment.set('hallId', id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"theatreId\": \"{{theatreId}}\",\n  \"name\": \"Screen 1\",\n  \"capacity\": 12\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls"]
+                },
+                "description": "Creates a screen and auto-generates seats 1..capacity."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Screen",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls/{{hallId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls", "{{hallId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Screen",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"capacity\": 15\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls/{{hallId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls", "{{hallId}}"]
+                },
+                "description": "Increasing capacity adds seats. Decreasing removes unbooked seats only."
+              },
+              "response": []
+            },
+            {
+              "name": "Regenerate Seats",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"capacity\": 15\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls/{{hallId}}/seats/regenerate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls", "{{hallId}}", "seats", "regenerate"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Screen",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/halls/{{hallId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "halls", "{{hallId}}"]
+                },
+                "description": "Fails with 409 if screen has showtimes or bookings."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Bookings & Reports",
+          "item": [
+            {
+              "name": "List All Bookings",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const items = pm.response.json().data.items;",
+                      "  if (items?.length > 0) {",
+                      "    pm.collectionVariables.set('bookingId', items[0].id);",
+                      "    pm.environment.set('bookingId', items[0].id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/bookings?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "bookings"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" },
+                    { "key": "userId", "value": "{{userId}}", "disabled": true },
+                    { "key": "showtimeId", "value": "{{showtimeId}}", "disabled": true }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Booking (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/bookings/{{bookingId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "bookings", "{{bookingId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Occupancy Report",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/occupancy",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "occupancy"],
+                  "query": [
+                    { "key": "movieId", "value": "{{movieId}}", "disabled": true },
+                    { "key": "from", "value": "2026-01-01T00:00:00.000Z", "disabled": true },
+                    { "key": "to", "value": "2026-12-31T23:59:59.999Z", "disabled": true }
+                  ]
+                },
+                "description": "Total vs booked seats per showtime with fill percentage."
+              },
+              "response": []
+            },
+            {
+              "name": "Bookings Report",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/bookings?groupBy=day",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "bookings"],
+                  "query": [
+                    { "key": "groupBy", "value": "day" },
+                    { "key": "from", "value": "2026-01-01T00:00:00.000Z", "disabled": true },
+                    { "key": "to", "value": "2026-12-31T23:59:59.999Z", "disabled": true },
+                    { "key": "userId", "value": "{{targetUserId}}", "disabled": true },
+                    { "key": "movieId", "value": "{{movieId}}", "disabled": true }
+                  ]
+                },
+                "description": "Booking counts grouped by day, week, or month."
+              },
+              "response": []
+            },
+            {
+              "name": "Revenue Report",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/revenue",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "revenue"],
+                  "query": [
+                    { "key": "from", "value": "2026-01-01T00:00:00.000Z", "disabled": true },
+                    { "key": "to", "value": "2026-12-31T23:59:59.999Z", "disabled": true }
+                  ]
+                },
+                "description": "Revenue from confirmed bookings only. Defaults to last 30 days."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "List Users",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "  const me = pm.collectionVariables.get('userId');",
+                      "  const users = pm.response.json().data.items;",
+                      "  const target = users.find((u) => u.id !== me && u.role !== 'admin') || users.find((u) => u.id !== me) || users[0];",
+                      "  if (target) {",
+                      "    pm.collectionVariables.set('targetUserId', target.id);",
+                      "    pm.environment.set('targetUserId', target.id);",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get User (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{targetUserId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{targetUserId}}"]
+                },
+                "description": "Uses targetUserId — set by List Users. Avoids fetching your own admin profile."
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Role",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"admin\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{targetUserId}}/role",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{targetUserId}}", "role"]
+                },
+                "description": "Uses targetUserId. User must re-login for role change in JWT."
+              },
+              "response": []
+            },
+            {
+              "name": "Ban User",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"banned\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{targetUserId}}/ban",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{targetUserId}}", "ban"]
+                },
+                "description": "Uses targetUserId — never bans your own admin account."
+              },
+              "response": []
+            },
+            {
+              "name": "Unban User",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"banned\": false\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{targetUserId}}/ban",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{targetUserId}}", "ban"]
+                }
+              },
+              "response": []
+            }
+          ]
         }
       ]
     }

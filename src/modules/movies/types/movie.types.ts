@@ -36,46 +36,47 @@ export type MovieWithShowtimes = MovieRecord & {
 export type MovieResponse = MovieRecord;
 export type MovieDetailResponse = MovieWithShowtimes;
 
-export type SeatRow = {
+export type ShowtimeRecord = {
   id: string;
-  seat_number: number;
-  is_available: boolean;
-};
-
-export type SeatRecord = {
-  id: string;
-  seatNumber: number;
-  isAvailable: boolean;
-};
-
-export type ShowtimeSeatsResponse = {
-  showtimeId: string;
   movieId: string;
-  movieTitle: string;
   hallId: string;
-  hallName: string;
-  capacity: number;
   startTime: Date;
   endTime: Date;
-  seats: SeatRecord[];
+  ticketPrice: number;
 };
 
-export type CreateBookingInput = {
-  showtimeId: string;
-  seatIds: string[];
-};
-
-export type BookingSeatRecord = {
-  id: string;
-  seatNumber: number;
-};
-
-export type BookingRecord = {
-  id: string;
-  showtimeId: string;
+export type ShowtimeDetailResponse = ShowtimeRecord & {
   movieTitle: string;
   hallName: string;
+  capacity: number;
+};
+
+export type CreateMovieInput = {
+  title: string;
+  description: string;
+  durationMinutes: number;
+  genre: string;
+  rating: string;
+};
+
+export type UpdateMovieInput = Partial<CreateMovieInput>;
+
+export type CreateShowtimeInput = {
+  movieId: string;
+  hallId: string;
   startTime: Date;
-  seats: BookingSeatRecord[];
-  createdAt: Date;
+  endTime?: Date;
+  ticketPrice?: number;
+};
+
+export type UpdateShowtimeInput = {
+  hallId?: string;
+  startTime?: Date;
+  ticketPrice?: number;
+};
+
+export type HallRecord = {
+  id: string;
+  name: string;
+  capacity: number;
 };

@@ -1,18 +1,26 @@
-import { withAuth } from '@/core/auth/auth.middleware';
+import { withAdmin, withAuth } from '@/core/auth/auth.middleware';
 import { parseJsonBody } from '@/core/http/request';
 import { jsonResponse } from '@/core/http/response';
 import {
-  createBookingSchema,
+  createMovieSchema,
+  createShowtimeSchema,
   listMoviesQuerySchema,
   movieIdSchema,
   showtimeIdSchema,
+  updateMovieSchema,
+  updateShowtimeSchema,
 } from '@/modules/movies/validations/movie.validation';
 import {
-  createBooking,
+  createMovie,
+  createShowtime,
+  deleteMovie,
+  deleteShowtime,
   getMovieById,
   getMovies,
-  getMyBookings,
-  getShowtimeSeats,
+  getShowtimeDetail,
+  getShowtimesByMovieId,
+  updateMovie,
+  updateShowtime,
 } from '@/modules/movies/services/movie.service';
 
 export const listMoviesHandler = withAuth(async (req) => {
@@ -33,23 +41,64 @@ export const getMovieHandler = withAuth(async (_req, params) => {
   return jsonResponse(movie);
 });
 
-export const getShowtimeSeatsHandler = withAuth(async (_req, params) => {
+export const listShowtimesByMovieHandler = withAuth(async (_req, params) => {
+  const { id } = movieIdSchema.parse(params);
+  const showtimes = await getShowtimesByMovieId(id);
+
+  return jsonResponse(showtimes);
+});
+
+export const getShowtimeHandler = withAuth(async (_req, params) => {
   const { id } = showtimeIdSchema.parse(params);
-  const seats = await getShowtimeSeats(id);
+  const showtime = await getShowtimeDetail(id);
 
-  return jsonResponse(seats);
+  return jsonResponse(showtime);
 });
 
-export const createBookingHandler = withAuth(async (req, _params, auth) => {
+export const createMovieHandler = withAdmin(async (req) => {
   const body = await parseJsonBody<unknown>(req);
-  const input = createBookingSchema.parse(body);
-  const booking = await createBooking(auth.userId, input);
+  const input = createMovieSchema.parse(body);
+  const movie = await createMovie(input);
 
-  return jsonResponse(booking, 201);
+  return jsonResponse(movie, 201);
 });
 
-export const getMyBookingsHandler = withAuth(async (_req, _params, auth) => {
-  const bookings = await getMyBookings(auth.userId);
+export const updateMovieHandler = withAdmin(async (req, params) => {
+  const { id } = movieIdSchema.parse(params);
+  const body = await parseJsonBody<unknown>(req);
+  const input = updateMovieSchema.parse(body);
+  const movie = await updateMovie(id, input);
 
-  return jsonResponse(bookings);
+  return jsonResponse(movie);
+});
+
+export const deleteMovieHandler = withAdmin(async (_req, params) => {
+  const { id } = movieIdSchema.parse(params);
+  await deleteMovie(id);
+
+  return jsonResponse({ message: 'Movie deleted' });
+});
+
+export const createShowtimeHandler = withAdmin(async (req) => {
+  const body = await parseJsonBody<unknown>(req);
+  const input = createShowtimeSchema.parse(body);
+  const showtime = await createShowtime(input);
+
+  return jsonResponse(showtime, 201);
+});
+
+export const updateShowtimeHandler = withAdmin(async (req, params) => {
+  const { id } = showtimeIdSchema.parse(params);
+  const body = await parseJsonBody<unknown>(req);
+  const input = updateShowtimeSchema.parse(body);
+  const showtime = await updateShowtime(id, input);
+
+  return jsonResponse(showtime);
+});
+
+export const deleteShowtimeHandler = withAdmin(async (_req, params) => {
+  const { id } = showtimeIdSchema.parse(params);
+  await deleteShowtime(id);
+
+  return jsonResponse({ message: 'Showtime deleted' });
 });
