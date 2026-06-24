@@ -12,4 +12,6 @@ const envSchema = z.object({
   DB_IDLE_TIMEOUT: z.coerce.number().int().positive().default(30),
 });
 
-export const env = envSchema.parse(process.env);
+const env = envSchema.parse(process.env);
+
+export default env;

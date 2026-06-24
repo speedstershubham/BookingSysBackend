@@ -1,5 +1,5 @@
-import { runMigrations } from '@/database/migrate';
-import { logger } from '@/core/logger/logger';
+import runMigrations from '@/database/migrate';
+import logger from '@/core/logger/logger';
 
 try {
   await runMigrations();

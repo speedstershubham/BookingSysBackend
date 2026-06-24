@@ -1,4 +1,4 @@
-import type { UserResponse } from '@/modules/users/types/user.types';
+import type UserTypes from '@/modules/users/types/user.types';
 
 export type SignupInput = {
   name: string;
@@ -12,6 +12,6 @@ export type LoginInput = {
 };
 
 export type AuthResponse = {
-  user: UserResponse;
+  user: UserTypes.UserResponse;
   token: string;
 };

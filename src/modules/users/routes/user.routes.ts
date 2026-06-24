@@ -1,18 +1,17 @@
-import type { Route } from '@/core/router/router';
-import {
-  getUserHandler,
-  listUsersHandler,
-} from '@/modules/users/controllers/user.controller';
+import type RouterTypes from '@/core/router/router.types';
+import userController from '@/modules/users/controllers/user.controller';
 
-export const userRoutes: Route[] = [
+const userRoutes: RouterTypes.Route[] = [
   {
     method: 'GET',
     path: '/api/users',
-    handler: listUsersHandler,
+    handler: userController.listUsersHandler,
   },
   {
     method: 'GET',
     path: '/api/users/:id',
-    handler: getUserHandler,
+    handler: userController.getUserHandler,
   },
 ];
+
+export default userRoutes;

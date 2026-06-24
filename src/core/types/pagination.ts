@@ -1,26 +1,13 @@
-export type PaginationParams = {
-  page: number;
-  limit: number;
-};
+import type PaginationTypes from '@/core/types/pagination.types';
 
-export type PaginatedResult<T> = {
-  items: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-};
-
-export function buildPagination(
-  params: PaginationParams,
+const buildPagination = (
+  params: PaginationTypes.PaginationParams,
   total: number,
-): PaginatedResult<never>['pagination'] {
-  return {
-    page: params.page,
-    limit: params.limit,
-    total,
-    totalPages: Math.ceil(total / params.limit) || 0,
-  };
-}
+): PaginationTypes.PaginatedResult<never>['pagination'] => ({
+  page: params.page,
+  limit: params.limit,
+  total,
+  totalPages: Math.ceil(total / params.limit) || 0,
+});
+
+export default { buildPagination };

@@ -1,29 +1,30 @@
 import bcrypt from 'bcrypt';
-import { signToken } from '@/core/auth/jwt';
-import { AppError } from '@/core/errors/app-error';
-import { isUniqueViolation } from '@/core/errors/postgres-error';
-import {
-  createUserRecord,
-  findUserRecordByEmail,
-} from '@/modules/auth/repository/auth.repository';
+import jwt from '@/core/auth/jwt';
+import AppError from '@/core/errors/app-error';
+import postgresError from '@/core/errors/postgres-error';
+import authRepository from '@/modules/auth/repository/auth.repository';
 import type {
   AuthResponse,
   LoginInput,
   SignupInput,
 } from '@/modules/auth/types/auth.types';
-import { getUserById } from '@/modules/users/services/user.service';
-import type { UserResponse } from '@/modules/users/types/user.types';
+import userService from '@/modules/users/services/user.service';
+import type UserTypes from '@/modules/users/types/user.types';
 
-function toAuthResponse(user: UserResponse, token: string): AuthResponse {
-  return { user, token };
-}
+const toAuthResponse = (
+  user: UserTypes.UserResponse,
+  token: string,
+): AuthResponse => ({
+  user,
+  token,
+});
 
-export async function signup(input: SignupInput): Promise<AuthResponse> {
+const signup = async (input: SignupInput): Promise<AuthResponse> => {
   const now = new Date();
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
   try {
-    const user = await createUserRecord({
+    const user = await authRepository.createUserRecord({
       name: input.name.trim(),
       email: input.email.toLowerCase(),
       password: hashedPassword,
@@ -31,20 +32,22 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
       updatedAt: now,
     });
 
-    const token = signToken({ userId: user.id, email: user.email });
+    const token = jwt.signToken({ userId: user.id, email: user.email });
 
     return toAuthResponse(user, token);
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
     }
 
     throw error;
   }
-}
+};
 
-export async function login(input: LoginInput): Promise<AuthResponse> {
-  const user = await findUserRecordByEmail(input.email.toLowerCase());
+const login = async (input: LoginInput): Promise<AuthResponse> => {
+  const user = await authRepository.findUserRecordByEmail(
+    input.email.toLowerCase(),
+  );
 
   if (!user) {
     throw new AppError(401, 'Invalid email or password');
@@ -59,7 +62,7 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     throw new AppError(401, 'Invalid email or password');
   }
 
-  const token = signToken({ userId: user.id, email: user.email });
+  const token = jwt.signToken({ userId: user.id, email: user.email });
 
   return toAuthResponse(
     {
@@ -71,10 +74,10 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     },
     token,
   );
-}
+};
 
-export async function getAuthenticatedUser(
+const getAuthenticatedUser = async (
   userId: string,
-): Promise<UserResponse> {
-  return getUserById(userId);
-}
+): Promise<UserTypes.UserResponse> => userService.getUserById(userId);
+
+export default { signup, login, getAuthenticatedUser };

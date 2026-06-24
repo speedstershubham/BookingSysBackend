@@ -1,34 +1,29 @@
-import { withAuth } from '@/core/auth/auth.middleware';
-import { parseJsonBody } from '@/core/http/request';
-import { jsonResponse } from '@/core/http/response';
-import {
-  loginSchema,
-  signupSchema,
-} from '@/modules/auth/validations/auth.validation';
-import {
-  getAuthenticatedUser,
-  login,
-  signup,
-} from '@/modules/auth/services/auth.service';
+import authMiddleware from '@/core/auth/auth.middleware';
+import request from '@/core/http/request';
+import response from '@/core/http/response';
+import authValidation from '@/modules/auth/validations/auth.validation';
+import authService from '@/modules/auth/services/auth.service';
 
-export const signupHandler = async (req: Request) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = signupSchema.parse(body);
-  const result = await signup(input);
+const signupHandler = async (req: Request) => {
+  const body = await request.parseJsonBody<unknown>(req);
+  const input = authValidation.signupSchema.parse(body);
+  const result = await authService.signup(input);
 
-  return jsonResponse(result, 201);
+  return response.jsonResponse(result, 201);
 };
 
-export const loginHandler = async (req: Request) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = loginSchema.parse(body);
-  const result = await login(input);
+const loginHandler = async (req: Request) => {
+  const body = await request.parseJsonBody<unknown>(req);
+  const input = authValidation.loginSchema.parse(body);
+  const result = await authService.login(input);
 
-  return jsonResponse(result);
+  return response.jsonResponse(result);
 };
 
-export const meHandler = withAuth(async (_req, _params, auth) => {
-  const user = await getAuthenticatedUser(auth.userId);
+const meHandler = authMiddleware.withAuth(async (_req, _params, auth) => {
+  const user = await authService.getAuthenticatedUser(auth.userId);
 
-  return jsonResponse(user);
+  return response.jsonResponse(user);
 });
+
+export default { signupHandler, loginHandler, meHandler };

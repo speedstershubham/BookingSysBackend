@@ -1,24 +1,22 @@
-import type { Route } from '@/core/router/router';
-import {
-  loginHandler,
-  meHandler,
-  signupHandler,
-} from '@/modules/auth/controllers/auth.controller';
+import type RouterTypes from '@/core/router/router.types';
+import authController from '@/modules/auth/controllers/auth.controller';
 
-export const authRoutes: Route[] = [
+const authRoutes: RouterTypes.Route[] = [
   {
     method: 'POST',
     path: '/api/auth/signup',
-    handler: signupHandler,
+    handler: authController.signupHandler,
   },
   {
     method: 'POST',
     path: '/api/auth/login',
-    handler: loginHandler,
+    handler: authController.loginHandler,
   },
   {
     method: 'GET',
     path: '/api/auth/me',
-    handler: meHandler,
+    handler: authController.meHandler,
   },
 ];
+
+export default authRoutes;

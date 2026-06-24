@@ -1,8 +1,9 @@
-import { AppError } from '@/core/errors/app-error';
-import { verifyToken, type JwtPayload } from '@/core/auth/jwt';
-import type { RouteHandler } from '@/core/router/router';
+import AppError from '@/core/errors/app-error';
+import jwt from '@/core/auth/jwt';
+import type AuthTypes from '@/core/auth/auth.types';
+import type RouterTypes from '@/core/router/router.types';
 
-export function authenticate(req: Request): JwtPayload {
+const authenticate = (req: Request): AuthTypes.JwtPayload => {
   const authHeader = req.headers.get('Authorization');
 
   if (!authHeader?.startsWith('Bearer ')) {
@@ -12,18 +13,16 @@ export function authenticate(req: Request): JwtPayload {
   const token = authHeader.slice('Bearer '.length);
 
   try {
-    return verifyToken(token);
+    return jwt.verifyToken(token);
   } catch {
     throw new AppError(401, 'Invalid or expired token');
   }
-}
+};
 
-type AuthenticatedHandler = (
-  req: Request,
-  params: Record<string, string>,
-  auth: JwtPayload,
-) => Promise<Response>;
-
-export function withAuth(handler: AuthenticatedHandler): RouteHandler {
+const withAuth = (
+  handler: AuthTypes.AuthenticatedHandler,
+): RouterTypes.RouteHandler => {
   return (req, params) => handler(req, params, authenticate(req));
-}
+};
+
+export default { authenticate, withAuth };
