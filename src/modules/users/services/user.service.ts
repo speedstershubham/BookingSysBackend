@@ -26,7 +26,7 @@ const createUser = async (input: CreateUserInput): Promise<UserResponse> => {
 
     return toUserResponse(user);
   } catch (error) {
-    if (postgresError.isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
     }
 

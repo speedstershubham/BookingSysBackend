@@ -5,7 +5,7 @@ import authValidation from '@/modules/auth/validations/auth.validation';
 import authService from '@/modules/auth/services/auth.service';
 
 const signupHandler = async (req: Request) => {
-  const body = await request.parseJsonBody<unknown>(req);
+  const body = await request.parseJsonBody(req);
   const input = authValidation.signupSchema.parse(body);
   const result = await authService.signup(input);
 
@@ -13,7 +13,7 @@ const signupHandler = async (req: Request) => {
 };
 
 const loginHandler = async (req: Request) => {
-  const body = await request.parseJsonBody<unknown>(req);
+  const body = await request.parseJsonBody(req);
   const input = authValidation.loginSchema.parse(body);
   const result = await authService.login(input);
 

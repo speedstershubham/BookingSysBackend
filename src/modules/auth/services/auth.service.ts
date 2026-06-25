@@ -38,7 +38,7 @@ const signup = async (input: SignupInput): Promise<AuthResponse> => {
 
     return toAuthResponse(toUserResponse(user), token);
   } catch (error) {
-    if (postgresError.isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
     }
 

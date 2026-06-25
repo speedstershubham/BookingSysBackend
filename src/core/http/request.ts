@@ -1,7 +1,8 @@
-const parseJsonBody = async <T>(req: Request): Promise<T> => {
+import type { JsonBody } from '@/core/http/http.types';
+
+const parseJsonBody = async (req: Request): Promise<JsonBody> => {
   try {
-    const data = await req.json();
-    return data as T;
+    return (await req.json()) as JsonBody;
   } catch {
     throw new Error('Invalid JSON body');
   }

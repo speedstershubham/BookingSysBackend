@@ -7,7 +7,7 @@ const jsonResponse = (
   status = 200,
 ): Response => Response.json({ success: true, data }, { status });
 
-const errorResponse = (error: unknown): Response => {
+const errorResponse = (error: Error): Response => {
   if (error instanceof AppError) {
     return Response.json(
       { success: false, message: error.message },
