@@ -1,22 +1,43 @@
 import { SQL } from 'bun';
 import env from '@/config/env';
 
-const sql = new SQL({
-  url: env.DATABASE_URL,
-  max: env.DB_POOL_MAX,
-  idleTimeout: env.DB_IDLE_TIMEOUT,
-});
+const createPostgresModule = () => {
+  let db: SQL | undefined;
+  let connectPromise: Promise<SQL> | undefined;
 
-const connectDB = async (): Promise<void> => {
-  try {
-    await sql`SELECT 1`;
-    console.log('✅ PostgreSQL Connected');
-  } catch (error) {
-    console.error('❌ PostgreSQL Connection Failed:', error);
-    process.exit(1);
-  }
+  const getDB = async (): Promise<SQL> => {
+    if (db) {
+      return db;
+    }
+
+    if (connectPromise) {
+      return connectPromise;
+    }
+
+    connectPromise = (async (): Promise<SQL> => {
+      try {
+        const instance = new SQL({
+          url: env.DATABASE_URL,
+          max: env.DB_POOL_MAX,
+          idleTimeout: env.DB_IDLE_TIMEOUT,
+        });
+
+        await instance`SELECT 1`;
+        console.log('✅ PostgreSQL Connected');
+        db = instance;
+
+        return instance;
+      } catch (error) {
+        connectPromise = undefined;
+        console.error('❌ PostgreSQL Connection Failed:', error);
+        process.exit(1);
+      }
+    })();
+
+    return connectPromise;
+  };
+
+  return getDB;
 };
 
-const getSql = (): SQL => sql;
-
-export default { sql, connectDB, getSql };
+export default createPostgresModule();

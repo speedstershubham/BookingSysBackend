@@ -19,22 +19,21 @@ const toAuthResponse = (
   token,
 });
 
-const signup = async (input: SignupInput): Promise<AuthResponse> => {
-  const now = new Date();
-  const hashedPassword = await bcrypt.hash(input.password, 10);
+const toUserResponse = (user: UserTypes.UserPublicRecord): UserTypes.UserResponse => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
 
+const signup = async (input: SignupInput): Promise<AuthResponse> => {
   try {
-    const user = await authRepository.createUserRecord({
-      name: input.name.trim(),
-      email: input.email.toLowerCase(),
-      password: hashedPassword,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const user = await authRepository.createUserRecord(input);
 
     const token = jwt.signToken({ userId: user.id, email: user.email });
 
-    return toAuthResponse(user, token);
+    return toAuthResponse(toUserResponse(user), token);
   } catch (error) {
     if (postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
@@ -45,9 +44,7 @@ const signup = async (input: SignupInput): Promise<AuthResponse> => {
 };
 
 const login = async (input: LoginInput): Promise<AuthResponse> => {
-  const user = await authRepository.findUserRecordByEmail(
-    input.email.toLowerCase(),
-  );
+  const user = await authRepository.findUserRecordByEmail(input.email);
 
   if (!user) {
     throw new AppError(401, 'Invalid email or password');

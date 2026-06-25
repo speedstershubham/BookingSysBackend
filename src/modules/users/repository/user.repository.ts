@@ -1,4 +1,5 @@
-import postgres from '@/database/postgres';
+import bcrypt from 'bcrypt';
+import getDB from '@/database/postgres';
 import userColumns from '@/modules/users/repository/user.columns';
 import type PaginationTypes from '@/core/types/pagination.types';
 import type UserTypes from '@/modules/users/types/user.types';
@@ -16,10 +17,26 @@ const mapAuthRow = (row: UserTypes.UserAuthRow): UserTypes.UserAuthRecord => ({
   password: row.password,
 });
 
+const createUser = async (
+  input: UserTypes.CreateUserInput,
+): Promise<UserTypes.UserPublicRecord> => {
+  const now = new Date();
+  const hashedPassword = await bcrypt.hash(input.password, 10);
+
+  return insertUser({
+    name: input.name.trim(),
+    email: input.email.toLowerCase(),
+    password: hashedPassword,
+    createdAt: now,
+    updatedAt: now,
+  });
+};
+
 const insertUser = async (
   payload: UserTypes.InsertUserPayload,
 ): Promise<UserTypes.UserPublicRecord> => {
-  const [user] = await postgres.sql<UserTypes.UserPublicRow[]>`
+  const db = await getDB();
+  const [user] = await db<UserTypes.UserPublicRow[]>`
     INSERT INTO users (name, email, password, created_at, updated_at)
     VALUES (
       ${payload.name},
@@ -28,7 +45,7 @@ const insertUser = async (
       ${payload.createdAt},
       ${payload.updatedAt}
     )
-    RETURNING ${postgres.sql.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
+    RETURNING ${db.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
   `;
 
   if (!user) {
@@ -41,10 +58,11 @@ const insertUser = async (
 const findUserByEmailForAuth = async (
   email: string,
 ): Promise<UserTypes.UserAuthRecord | null> => {
-  const [user] = await postgres.sql<UserTypes.UserAuthRow[]>`
-    SELECT ${postgres.sql.unsafe(userColumns.USER_AUTH_COLUMNS)}
+  const db = await getDB();
+  const [user] = await db<UserTypes.UserAuthRow[]>`
+    SELECT ${db.unsafe(userColumns.USER_AUTH_COLUMNS)}
     FROM users
-    WHERE email = ${email}
+    WHERE email = ${email.toLowerCase()}
     LIMIT 1
   `;
 
@@ -54,8 +72,9 @@ const findUserByEmailForAuth = async (
 const findUserById = async (
   id: string,
 ): Promise<UserTypes.UserPublicRecord | null> => {
-  const [user] = await postgres.sql<UserTypes.UserPublicRow[]>`
-    SELECT ${postgres.sql.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
+  const db = await getDB();
+  const [user] = await db<UserTypes.UserPublicRow[]>`
+    SELECT ${db.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
     FROM users
     WHERE id = ${id}
     LIMIT 1
@@ -67,15 +86,16 @@ const findUserById = async (
 const findUsers = async (
   params: PaginationTypes.PaginationParams,
 ): Promise<{ users: UserTypes.UserPublicRecord[]; total: number }> => {
+  const db = await getDB();
   const offset = (params.page - 1) * params.limit;
 
-  const [countRow] = await postgres.sql<{ count: string }[]>`
+  const [countRow] = await db<{ count: string }[]>`
     SELECT COUNT(*)::text AS count FROM users
   `;
   const total = Number(countRow?.count ?? 0);
 
-  const users = await postgres.sql<UserTypes.UserPublicRow[]>`
-    SELECT ${postgres.sql.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
+  const users = await db<UserTypes.UserPublicRow[]>`
+    SELECT ${db.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
     FROM users
     ORDER BY created_at DESC
     LIMIT ${params.limit}
@@ -89,6 +109,7 @@ const findUsers = async (
 };
 
 export default {
+  createUser,
   insertUser,
   findUserByEmailForAuth,
   findUserById,

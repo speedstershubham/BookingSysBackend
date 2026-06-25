@@ -1,4 +1,3 @@
-import bcrypt from 'bcrypt';
 import AppError from '@/core/errors/app-error';
 import postgresError from '@/core/errors/postgres-error';
 import pagination from '@/core/types/pagination';
@@ -17,17 +16,8 @@ const toUserResponse = (user: UserTypes.UserPublicRecord): UserTypes.UserRespons
 const createUser = async (
   input: UserTypes.CreateUserInput,
 ): Promise<UserTypes.UserResponse> => {
-  const now = new Date();
-  const hashedPassword = await bcrypt.hash(input.password, 10);
-
   try {
-    const user = await userRepository.insertUser({
-      name: input.name.trim(),
-      email: input.email.toLowerCase(),
-      password: hashedPassword,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const user = await userRepository.createUser(input);
 
     return toUserResponse(user);
   } catch (error) {

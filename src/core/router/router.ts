@@ -52,7 +52,8 @@ const createRouter = (routes: RouterTypes.Route[]) => {
       }
 
       try {
-        return await route.handler(req, params);
+        const body = await  route.handler(req, params);
+        return body
       } catch (error) {
         if (error instanceof Error && error.message === 'Invalid JSON body') {
           return response.errorResponse(new AppError(400, 'Invalid JSON body'));

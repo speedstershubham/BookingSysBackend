@@ -1,11 +1,11 @@
-import postgres from '@/database/postgres';
+import getDB from '@/database/postgres';
 import env from '@/config/env';
 import logger from '@/core/logger/logger';
 import handleRequest from '@/routes/index';
 
 const bootstrap = async () => {
   try {
-    await postgres.connectDB();
+    await getDB();
 
     Bun.serve({
       port: Number(env.PORT),
