@@ -1,9 +1,9 @@
 import AppError from '@/core/errors/app-error';
-import type HttpTypes from '@/core/http/http.types';
+import type { SuccessPayload } from '@/core/http/http.types';
 import { ZodError } from 'zod';
 
 const jsonResponse = (
-  data: HttpTypes.SuccessPayload,
+  data: SuccessPayload,
   status = 200,
 ): Response => Response.json({ success: true, data }, { status });
 

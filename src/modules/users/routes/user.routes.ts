@@ -1,7 +1,7 @@
-import type RouterTypes from '@/core/router/router.types';
+import type { Route } from '@/core/router/router.types';
 import userController from '@/modules/users/controllers/user.controller';
 
-const userRoutes: RouterTypes.Route[] = [
+const userRoutes: Route[] = [
   {
     method: 'GET',
     path: '/api/users',

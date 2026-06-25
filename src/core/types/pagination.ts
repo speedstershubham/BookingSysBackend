@@ -1,9 +1,9 @@
-import type PaginationTypes from '@/core/types/pagination.types';
+import type { PaginationParams, PaginatedResult } from '@/core/types/pagination.types';
 
 const buildPagination = (
-  params: PaginationTypes.PaginationParams,
+  params: PaginationParams,
   total: number,
-): PaginationTypes.PaginatedResult<never>['pagination'] => ({
+): PaginatedResult<never>['pagination'] => ({
   page: params.page,
   limit: params.limit,
   total,

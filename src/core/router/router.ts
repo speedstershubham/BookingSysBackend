@@ -1,6 +1,6 @@
 import response from '@/core/http/response';
 import AppError from '@/core/errors/app-error';
-import type RouterTypes from '@/core/router/router.types';
+import type { Route } from '@/core/router/router.types';
 
 const matchRoute = (
   pattern: string,
@@ -36,7 +36,7 @@ const matchRoute = (
   return params;
 };
 
-const createRouter = (routes: RouterTypes.Route[]) => {
+const createRouter = (routes: Route[]) => {
   return async (req: Request): Promise<Response | null> => {
     const url = new URL(req.url);
 

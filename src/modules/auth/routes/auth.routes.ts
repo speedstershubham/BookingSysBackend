@@ -1,7 +1,7 @@
-import type RouterTypes from '@/core/router/router.types';
+import type { Route } from '@/core/router/router.types';
 import authController from '@/modules/auth/controllers/auth.controller';
 
-const authRoutes: RouterTypes.Route[] = [
+const authRoutes: Route[] = [
   {
     method: 'POST',
     path: '/api/auth/signup',

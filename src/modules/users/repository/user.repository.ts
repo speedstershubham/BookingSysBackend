@@ -1,10 +1,17 @@
 import bcrypt from 'bcrypt';
 import getDB from '@/database/postgres';
 import userColumns from '@/modules/users/repository/user.columns';
-import type PaginationTypes from '@/core/types/pagination.types';
-import type UserTypes from '@/modules/users/types/user.types';
+import type { PaginationParams } from '@/core/types/pagination.types';
+import type {
+  InsertUserPayload,
+  UserAuthRecord,
+  UserAuthRow,
+  UserPublicRecord,
+  UserPublicRow,
+  CreateUserInput,
+} from '@/modules/users/types/user.types';
 
-const mapPublicRow = (row: UserTypes.UserPublicRow): UserTypes.UserPublicRecord => ({
+const mapPublicRow = (row: UserPublicRow): UserPublicRecord => ({
   id: row.id,
   name: row.name,
   email: row.email,
@@ -12,14 +19,14 @@ const mapPublicRow = (row: UserTypes.UserPublicRow): UserTypes.UserPublicRecord 
   updatedAt: row.updated_at,
 });
 
-const mapAuthRow = (row: UserTypes.UserAuthRow): UserTypes.UserAuthRecord => ({
+const mapAuthRow = (row: UserAuthRow): UserAuthRecord => ({
   ...mapPublicRow(row),
   password: row.password,
 });
 
 const createUser = async (
-  input: UserTypes.CreateUserInput,
-): Promise<UserTypes.UserPublicRecord> => {
+  input: CreateUserInput,
+): Promise<UserPublicRecord> => {
   const now = new Date();
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
@@ -33,10 +40,10 @@ const createUser = async (
 };
 
 const insertUser = async (
-  payload: UserTypes.InsertUserPayload,
-): Promise<UserTypes.UserPublicRecord> => {
+  payload: InsertUserPayload,
+): Promise<UserPublicRecord> => {
   const db = await getDB();
-  const [user] = await db<UserTypes.UserPublicRow[]>`
+  const [user] = await db<UserPublicRow[]>`
     INSERT INTO users (name, email, password, created_at, updated_at)
     VALUES (
       ${payload.name},
@@ -57,9 +64,9 @@ const insertUser = async (
 
 const findUserByEmailForAuth = async (
   email: string,
-): Promise<UserTypes.UserAuthRecord | null> => {
+): Promise<UserAuthRecord | null> => {
   const db = await getDB();
-  const [user] = await db<UserTypes.UserAuthRow[]>`
+  const [user] = await db<UserAuthRow[]>`
     SELECT ${db.unsafe(userColumns.USER_AUTH_COLUMNS)}
     FROM users
     WHERE email = ${email.toLowerCase()}
@@ -69,11 +76,9 @@ const findUserByEmailForAuth = async (
   return user ? mapAuthRow(user) : null;
 };
 
-const findUserById = async (
-  id: string,
-): Promise<UserTypes.UserPublicRecord | null> => {
+const findUserById = async (id: string): Promise<UserPublicRecord | null> => {
   const db = await getDB();
-  const [user] = await db<UserTypes.UserPublicRow[]>`
+  const [user] = await db<UserPublicRow[]>`
     SELECT ${db.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
     FROM users
     WHERE id = ${id}
@@ -84,8 +89,8 @@ const findUserById = async (
 };
 
 const findUsers = async (
-  params: PaginationTypes.PaginationParams,
-): Promise<{ users: UserTypes.UserPublicRecord[]; total: number }> => {
+  params: PaginationParams,
+): Promise<{ users: UserPublicRecord[]; total: number }> => {
   const db = await getDB();
   const offset = (params.page - 1) * params.limit;
 
@@ -94,7 +99,7 @@ const findUsers = async (
   `;
   const total = Number(countRow?.count ?? 0);
 
-  const users = await db<UserTypes.UserPublicRow[]>`
+  const users = await db<UserPublicRow[]>`
     SELECT ${db.unsafe(userColumns.USER_PUBLIC_COLUMNS)}
     FROM users
     ORDER BY created_at DESC

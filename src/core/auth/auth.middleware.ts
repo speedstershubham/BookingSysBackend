@@ -1,9 +1,12 @@
 import AppError from '@/core/errors/app-error';
 import jwt from '@/core/auth/jwt';
-import type AuthTypes from '@/core/auth/auth.types';
-import type RouterTypes from '@/core/router/router.types';
+import type {
+  AuthenticatedHandler,
+  JwtPayload,
+} from '@/core/auth/auth.types';
+import type { RouteHandler } from '@/core/router/router.types';
 
-const authenticate = (req: Request): AuthTypes.JwtPayload => {
+const authenticate = (req: Request): JwtPayload => {
   const authHeader = req.headers.get('Authorization');
 
   if (!authHeader?.startsWith('Bearer ')) {
@@ -20,8 +23,8 @@ const authenticate = (req: Request): AuthTypes.JwtPayload => {
 };
 
 const withAuth = (
-  handler: AuthTypes.AuthenticatedHandler,
-): RouterTypes.RouteHandler => {
+  handler: AuthenticatedHandler,
+): RouteHandler => {
   return (req, params) => handler(req, params, authenticate(req));
 };
 

@@ -2,10 +2,17 @@ import AppError from '@/core/errors/app-error';
 import postgresError from '@/core/errors/postgres-error';
 import pagination from '@/core/types/pagination';
 import userRepository from '@/modules/users/repository/user.repository';
-import type PaginationTypes from '@/core/types/pagination.types';
-import type UserTypes from '@/modules/users/types/user.types';
+import type {
+  PaginatedResult,
+  PaginationParams,
+} from '@/core/types/pagination.types';
+import type {
+  CreateUserInput,
+  UserPublicRecord,
+  UserResponse,
+} from '@/modules/users/types/user.types';
 
-const toUserResponse = (user: UserTypes.UserPublicRecord): UserTypes.UserResponse => ({
+const toUserResponse = (user: UserPublicRecord): UserResponse => ({
   id: user.id,
   name: user.name,
   email: user.email,
@@ -13,9 +20,7 @@ const toUserResponse = (user: UserTypes.UserPublicRecord): UserTypes.UserRespons
   updatedAt: user.updatedAt,
 });
 
-const createUser = async (
-  input: UserTypes.CreateUserInput,
-): Promise<UserTypes.UserResponse> => {
+const createUser = async (input: CreateUserInput): Promise<UserResponse> => {
   try {
     const user = await userRepository.createUser(input);
 
@@ -29,7 +34,7 @@ const createUser = async (
   }
 };
 
-const getUserById = async (id: string): Promise<UserTypes.UserResponse> => {
+const getUserById = async (id: string): Promise<UserResponse> => {
   const user = await userRepository.findUserById(id);
 
   if (!user) {
@@ -40,8 +45,8 @@ const getUserById = async (id: string): Promise<UserTypes.UserResponse> => {
 };
 
 const getUsers = async (
-  params: PaginationTypes.PaginationParams,
-): Promise<PaginationTypes.PaginatedResult<UserTypes.UserResponse>> => {
+  params: PaginationParams,
+): Promise<PaginatedResult<UserResponse>> => {
   const { users, total } = await userRepository.findUsers(params);
 
   return {

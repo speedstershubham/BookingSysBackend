@@ -9,17 +9,20 @@ import type {
   SignupInput,
 } from '@/modules/auth/types/auth.types';
 import userService from '@/modules/users/services/user.service';
-import type UserTypes from '@/modules/users/types/user.types';
+import type {
+  UserPublicRecord,
+  UserResponse,
+} from '@/modules/users/types/user.types';
 
 const toAuthResponse = (
-  user: UserTypes.UserResponse,
+  user: UserResponse,
   token: string,
 ): AuthResponse => ({
   user,
   token,
 });
 
-const toUserResponse = (user: UserTypes.UserPublicRecord): UserTypes.UserResponse => ({
+const toUserResponse = (user: UserPublicRecord): UserResponse => ({
   id: user.id,
   name: user.name,
   email: user.email,
@@ -75,6 +78,6 @@ const login = async (input: LoginInput): Promise<AuthResponse> => {
 
 const getAuthenticatedUser = async (
   userId: string,
-): Promise<UserTypes.UserResponse> => userService.getUserById(userId);
+): Promise<UserResponse> => userService.getUserById(userId);
 
 export default { signup, login, getAuthenticatedUser };
