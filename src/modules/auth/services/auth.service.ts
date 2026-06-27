@@ -7,10 +7,7 @@ import {
 } from '@/core/auth/token.utils';
 import { AppError } from '@/core/errors/app-error';
 import { isUniqueViolation } from '@/core/errors/postgres-error';
-import {
-  createUserRecord,
-  findUserRecordByEmail,
-} from '@/modules/auth/repository/auth.repository';
+import authRepository from '@/modules/auth/repository/auth.repository';
 import {
   blacklistAccessToken,
   insertRefreshToken,
@@ -26,10 +23,7 @@ import type {
   SignupInput,
   UpdateProfileInput,
 } from '@/modules/auth/types/auth.types';
-import {
-  findUserAuthById,
-  updateUserProfile,
-} from '@/modules/users/repository/user.repository';
+import userRepository from '@/modules/users/repository/user.repository';
 import { getUserById } from '@/modules/users/services/user.service';
 import type { UserResponse } from '@/modules/users/types/user.types';
 
@@ -110,7 +104,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
   try {
-    const user = await createUserRecord({
+    const user = await authRepository.createUserRecord({
       name: input.name.trim(),
       email: input.email.toLowerCase(),
       password: hashedPassword,
@@ -129,7 +123,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
 }
 
 export async function login(input: LoginInput): Promise<AuthResponse> {
-  const user = await findUserRecordByEmail(input.email.toLowerCase());
+  const user = await authRepository.findUserRecordByEmail(input.email.toLowerCase());
 
   if (!user) {
     throw new AppError(401, 'Invalid email or password');
@@ -196,7 +190,7 @@ export async function updateProfile(
   userId: string,
   input: UpdateProfileInput,
 ): Promise<UserResponse> {
-  const user = await findUserAuthById(userId);
+  const user = await userRepository.findUserAuthById(userId);
 
   if (!user) {
     throw new AppError(404, 'User not found');
@@ -218,7 +212,7 @@ export async function updateProfile(
   }
 
   if (input.email && input.email.toLowerCase() !== user.email) {
-    const existing = await findUserRecordByEmail(input.email.toLowerCase());
+    const existing = await authRepository.findUserRecordByEmail(input.email.toLowerCase());
 
     if (existing && existing.id !== userId) {
       throw new AppError(409, 'Email is already registered');
@@ -230,7 +224,7 @@ export async function updateProfile(
       ? await bcrypt.hash(input.newPassword, 10)
       : undefined;
 
-    const updated = await updateUserProfile(userId, {
+    const updated = await userRepository.updateUserProfile(userId, {
       name: input.name?.trim(),
       email: input.email?.toLowerCase(),
       password: hashedPassword,

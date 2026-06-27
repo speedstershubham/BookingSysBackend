@@ -6,11 +6,7 @@ import {
   type PaginatedResult,
   type PaginationParams,
 } from '@/core/types/pagination';
-import {
-  findUserById,
-  findUsers,
-  insertUser,
-} from '@/modules/users/repository/user.repository';
+import userRepository from '@/modules/users/repository/user.repository';
 import type {
   CreateUserInput,
   UserPublicRecord,
@@ -37,7 +33,7 @@ export async function createUser(
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
   try {
-    const user = await insertUser({
+    const user = await userRepository.insertUser({
       name: input.name.trim(),
       email: input.email.toLowerCase(),
       password: hashedPassword,
@@ -56,7 +52,7 @@ export async function createUser(
 }
 
 export async function getUserById(id: string): Promise<UserResponse> {
-  const user = await findUserById(id);
+  const user = await userRepository.findUserById(id);
 
   if (!user) {
     throw new AppError(404, 'User not found');
@@ -68,7 +64,7 @@ export async function getUserById(id: string): Promise<UserResponse> {
 export async function getUsers(
   params: PaginationParams,
 ): Promise<PaginatedResult<UserResponse>> {
-  const { users, total } = await findUsers(params);
+  const { users, total } = await userRepository.findUsers(params);
 
   return {
     items: users.map(toUserResponse),

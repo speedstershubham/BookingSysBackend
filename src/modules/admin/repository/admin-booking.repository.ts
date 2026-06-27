@@ -1,4 +1,4 @@
-import { sql } from '@/database/postgres';
+import { db } from '@/database/postgres';
 import type {
   AdminBookingRecord,
   BookingsReport,
@@ -84,8 +84,8 @@ export async function findAllBookings(
   const from = filters.from ?? null;
   const to = filters.to ?? null;
 
-  const [countRow] = await sql<{ count: string }[]>`
-    SELECT COUNT(DISTINCT mb.id)::text AS count
+  const [countRow] = await db<{ count: number }[]>`
+    SELECT COUNT(DISTINCT mb.id)::int AS count
     FROM movie_bookings mb
     WHERE (${userId}::uuid IS NULL OR mb.user_id = ${userId})
       AND (${showtimeId}::uuid IS NULL OR mb.showtime_id = ${showtimeId})
@@ -93,7 +93,7 @@ export async function findAllBookings(
       AND (${to}::timestamptz IS NULL OR mb.created_at <= ${to})
   `;
 
-  const rows = await sql<AdminBookingRow[]>`
+  const rows = await db<AdminBookingRow[]>`
     SELECT
       mb.id AS booking_id,
       u.id AS user_id,
@@ -131,14 +131,14 @@ export async function findAllBookings(
 
   return {
     bookings: groupBookingRows(rows),
-    total: Number(countRow?.count ?? 0),
+    total: countRow!.count,
   };
 }
 
 export async function findAdminBookingById(
   bookingId: string,
 ): Promise<AdminBookingRecord | null> {
-  const rows = await sql<AdminBookingRow[]>`
+  const rows = await db<AdminBookingRow[]>`
     SELECT
       mb.id AS booking_id,
       u.id AS user_id,
@@ -182,16 +182,16 @@ export async function getRevenueReport(
   const from = filters.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const to = filters.to ?? new Date();
 
-  const [summary] = await sql<
+  const [summary] = await db<
     {
-      total_bookings: string;
-      total_seats: string;
+      total_bookings: number;
+      total_seats: number;
       total_revenue: string;
     }[]
   >`
     SELECT
-      COUNT(DISTINCT mb.id)::text AS total_bookings,
-      COUNT(mbs.id)::text AS total_seats,
+      COUNT(DISTINCT mb.id)::int AS total_bookings,
+      COUNT(mbs.id)::int AS total_seats,
       COALESCE(SUM(st.ticket_price), 0)::text AS total_revenue
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
@@ -201,20 +201,20 @@ export async function getRevenueReport(
       AND mb.created_at <= ${to}
   `;
 
-  const byMovie = await sql<
+  const byMovie = await db<
     {
       movie_id: string;
       movie_title: string;
-      booking_count: string;
-      seats_sold: string;
+      booking_count: number;
+      seats_sold: number;
       revenue: string;
     }[]
   >`
     SELECT
       m.id AS movie_id,
       m.title AS movie_title,
-      COUNT(DISTINCT mb.id)::text AS booking_count,
-      COUNT(mbs.id)::text AS seats_sold,
+      COUNT(DISTINCT mb.id)::int AS booking_count,
+      COUNT(mbs.id)::int AS seats_sold,
       COALESCE(SUM(st.ticket_price), 0)::text AS revenue
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
@@ -227,18 +227,18 @@ export async function getRevenueReport(
     ORDER BY revenue DESC
   `;
 
-  const byDate = await sql<
+  const byDate = await db<
     {
       date: string;
-      booking_count: string;
-      seats_sold: string;
+      booking_count: number;
+      seats_sold: number;
       revenue: string;
     }[]
   >`
     SELECT
       DATE(mb.created_at)::text AS date,
-      COUNT(DISTINCT mb.id)::text AS booking_count,
-      COUNT(mbs.id)::text AS seats_sold,
+      COUNT(DISTINCT mb.id)::int AS booking_count,
+      COUNT(mbs.id)::int AS seats_sold,
       COALESCE(SUM(st.ticket_price), 0)::text AS revenue
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
@@ -253,23 +253,23 @@ export async function getRevenueReport(
   return {
     from: from.toISOString(),
     to: to.toISOString(),
-    totalBookings: Number(summary?.total_bookings ?? 0),
-    totalSeatsSold: Number(summary?.total_seats ?? 0),
-    totalRevenue: Number(summary?.total_revenue ?? 0),
+    totalBookings: summary!.total_bookings,
+    totalSeatsSold: summary!.total_seats,
+    totalRevenue: Number(summary!.total_revenue),
     byMovie: byMovie.map(
       (row): RevenueByMovie => ({
         movieId: row.movie_id,
         movieTitle: row.movie_title,
-        bookingCount: Number(row.booking_count),
-        seatsSold: Number(row.seats_sold),
+        bookingCount: row.booking_count,
+        seatsSold: row.seats_sold,
         revenue: Number(row.revenue),
       }),
     ),
     byDate: byDate.map(
       (row): RevenueByDate => ({
         date: row.date,
-        bookingCount: Number(row.booking_count),
-        seatsSold: Number(row.seats_sold),
+        bookingCount: row.booking_count,
+        seatsSold: row.seats_sold,
         revenue: Number(row.revenue),
       }),
     ),
@@ -283,7 +283,7 @@ export async function getOccupancyReport(
   const from = filters.from ?? null;
   const to = filters.to ?? null;
 
-  const rows = await sql<
+  const rows = await db<
     {
       showtime_id: string;
       movie_id: string;
@@ -291,7 +291,7 @@ export async function getOccupancyReport(
       hall_name: string;
       start_time: Date;
       total_seats: number;
-      booked_seats: string;
+      booked_seats: number;
     }[]
   >`
     SELECT
@@ -301,7 +301,7 @@ export async function getOccupancyReport(
       h.name AS hall_name,
       st.start_time,
       h.capacity AS total_seats,
-      COUNT(mbs.id)::text AS booked_seats
+      COUNT(mbs.id)::int AS booked_seats
     FROM showtimes st
     JOIN movies m ON m.id = st.movie_id
     JOIN halls h ON h.id = st.hall_id
@@ -321,7 +321,7 @@ export async function getOccupancyReport(
     to: to?.toISOString() ?? null,
     movieId,
     items: rows.map((row) => {
-      const bookedSeats = Number(row.booked_seats);
+      const bookedSeats = row.booked_seats;
       const totalSeats = row.total_seats;
 
       return {
@@ -361,13 +361,13 @@ export async function getBookingsReport(
   const movieId = filters.movieId ?? null;
   const trunc = bookingsReportTrunc(filters.groupBy);
 
-  const rows = await sql<
-    { period: Date; booking_count: string; seats_sold: string }[]
+  const rows = await db<
+    { period: Date; booking_count: number; seats_sold: number }[]
   >`
     SELECT
       DATE_TRUNC(${trunc}, mb.created_at) AS period,
-      COUNT(DISTINCT mb.id)::text AS booking_count,
-      COUNT(mbs.id)::text AS seats_sold
+      COUNT(DISTINCT mb.id)::int AS booking_count,
+      COUNT(mbs.id)::int AS seats_sold
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
     JOIN movies m ON m.id = st.movie_id
@@ -387,8 +387,8 @@ export async function getBookingsReport(
     groupBy: filters.groupBy,
     periods: rows.map((row) => ({
       period: row.period.toISOString(),
-      bookingCount: Number(row.booking_count),
-      seatsSold: Number(row.seats_sold),
+      bookingCount: row.booking_count,
+      seatsSold: row.seats_sold,
     })),
   };
 }

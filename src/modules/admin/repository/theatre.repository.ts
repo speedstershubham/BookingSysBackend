@@ -1,4 +1,4 @@
-import { sql } from '@/database/postgres';
+import { db } from '@/database/postgres';
 import type {
   CreateTheatreInput,
   TheatreRecord,
@@ -25,7 +25,7 @@ function mapTheatre(row: TheatreRow): TheatreRecord {
 }
 
 export async function findTheatres(): Promise<TheatreRecord[]> {
-  const rows = await sql<TheatreRow[]>`
+  const rows = await db<TheatreRow[]>`
     SELECT id, name, location, created_at, updated_at
     FROM theatres
     ORDER BY name ASC
@@ -37,7 +37,7 @@ export async function findTheatres(): Promise<TheatreRecord[]> {
 export async function findTheatreById(
   id: string,
 ): Promise<TheatreRecord | null> {
-  const [row] = await sql<TheatreRow[]>`
+  const [row] = await db<TheatreRow[]>`
     SELECT id, name, location, created_at, updated_at
     FROM theatres
     WHERE id = ${id}
@@ -56,14 +56,14 @@ export async function findTheatreWithHalls(
     return null;
   }
 
-  const halls = await sql<
+  const halls = await db<
     {
       id: string;
       theatre_id: string;
       theatre_name: string;
       name: string;
       capacity: number;
-      seat_count: string;
+      seat_count: number;
       created_at: Date;
       updated_at: Date;
     }[]
@@ -74,7 +74,7 @@ export async function findTheatreWithHalls(
       t.name AS theatre_name,
       h.name,
       h.capacity,
-      COUNT(se.id)::text AS seat_count,
+      COUNT(se.id)::int AS seat_count,
       h.created_at,
       h.updated_at
     FROM halls h
@@ -93,7 +93,7 @@ export async function findTheatreWithHalls(
       theatreName: hall.theatre_name,
       name: hall.name,
       capacity: hall.capacity,
-      seatCount: Number(hall.seat_count),
+      seatCount: hall.seat_count,
       createdAt: hall.created_at,
       updatedAt: hall.updated_at,
     })),
@@ -104,7 +104,7 @@ export async function insertTheatre(
   input: CreateTheatreInput,
 ): Promise<TheatreRecord> {
   const now = new Date();
-  const [row] = await sql<TheatreRow[]>`
+  const [row] = await db<TheatreRow[]>`
     INSERT INTO theatres (name, location, created_at, updated_at)
     VALUES (${input.name}, ${input.location}, ${now}, ${now})
     RETURNING id, name, location, created_at, updated_at
@@ -121,7 +121,7 @@ export async function updateTheatreById(
   id: string,
   input: UpdateTheatreInput,
 ): Promise<TheatreRecord | null> {
-  const [existing] = await sql<TheatreRow[]>`
+  const [existing] = await db<TheatreRow[]>`
     SELECT id, name, location, created_at, updated_at
     FROM theatres
     WHERE id = ${id}
@@ -132,7 +132,7 @@ export async function updateTheatreById(
     return null;
   }
 
-  const [row] = await sql<TheatreRow[]>`
+  const [row] = await db<TheatreRow[]>`
     UPDATE theatres
     SET
       name = ${input.name ?? existing.name},
@@ -146,17 +146,17 @@ export async function updateTheatreById(
 }
 
 export async function countTheatreHalls(theatreId: string): Promise<number> {
-  const [row] = await sql<{ count: string }[]>`
-    SELECT COUNT(*)::text AS count
+  const [row] = await db<{ count: number }[]>`
+    SELECT COUNT(*)::int AS count
     FROM halls
     WHERE theatre_id = ${theatreId}
   `;
 
-  return Number(row?.count ?? 0);
+  return row!.count;
 }
 
 export async function deleteTheatreById(id: string): Promise<boolean> {
-  const result = await sql`
+  const result = await db`
     DELETE FROM theatres
     WHERE id = ${id}
   `;

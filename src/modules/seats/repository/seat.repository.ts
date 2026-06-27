@@ -1,4 +1,6 @@
-import { sql } from '@/database/postgres';
+import type { SQL } from 'bun';
+
+import { db } from '@/database/postgres';
 import type {
   HallSeatsResponse,
   SeatLockRow,
@@ -28,7 +30,7 @@ type SeatWithStatusRow = {
 export async function findHallById(
   hallId: string,
 ): Promise<{ id: string; name: string; capacity: number } | null> {
-  const [hall] = await sql<{ id: string; name: string; capacity: number }[]>`
+  const [hall] = await db<{ id: string; name: string; capacity: number }[]>`
     SELECT id, name, capacity
     FROM halls
     WHERE id = ${hallId}
@@ -47,7 +49,7 @@ export async function findHallSeats(
     return null;
   }
 
-  const seats = await sql<{ id: string; seat_number: number }[]>`
+  const seats = await db<{ id: string; seat_number: number }[]>`
     SELECT id, seat_number
     FROM seats
     WHERE hall_id = ${hallId}
@@ -68,7 +70,7 @@ export async function findHallSeats(
 async function findShowtimeMeta(
   showtimeId: string,
 ): Promise<ShowtimeMeta | null> {
-  const [showtime] = await sql<ShowtimeMeta[]>`
+  const [showtime] = await db<ShowtimeMeta[]>`
     SELECT
       s.id AS showtime_id,
       m.id AS movie_id,
@@ -121,13 +123,13 @@ export async function findShowtimeSeats(
     return null;
   }
 
-  await sql`
+  await db`
     DELETE FROM seat_locks
     WHERE showtime_id = ${showtimeId}
       AND locked_until <= NOW()
   `;
 
-  const seats = await sql<SeatWithStatusRow[]>`
+  const seats = await db<SeatWithStatusRow[]>`
     SELECT
       se.id,
       se.seat_number,
@@ -210,7 +212,7 @@ export async function lockSeats(
   seatIds: string[],
   lockedUntil: Date,
 ): Promise<void> {
-  await sql.begin(async (tx) => {
+  await db.begin(async (tx) => {
     const [showtime] = await tx<{ hall_id: string }[]>`
       SELECT hall_id
       FROM showtimes
@@ -226,7 +228,7 @@ export async function lockSeats(
       SELECT id
       FROM seats
       WHERE hall_id = ${showtime.hall_id}
-        AND id IN ${sql(seatIds)}
+        AND id IN ${tx(seatIds)}
     `;
 
     if (seats.length !== seatIds.length) {
@@ -238,7 +240,7 @@ export async function lockSeats(
       FROM movie_booking_seats mbs
       JOIN movie_bookings mb ON mb.id = mbs.booking_id
       WHERE mbs.showtime_id = ${showtimeId}
-        AND mbs.seat_id IN ${sql(seatIds)}
+        AND mbs.seat_id IN ${tx(seatIds)}
         AND mb.status = 'confirmed'
     `;
 
@@ -250,7 +252,7 @@ export async function lockSeats(
       SELECT seat_id, user_id, locked_until
       FROM seat_locks
       WHERE showtime_id = ${showtimeId}
-        AND seat_id IN ${sql(seatIds)}
+        AND seat_id IN ${tx(seatIds)}
         AND locked_until > NOW()
     `;
 
@@ -281,18 +283,18 @@ export async function unlockSeats(
   userId: string,
   seatIds: string[],
 ): Promise<number> {
-  const result = await sql`
+  const result = await db`
     DELETE FROM seat_locks
     WHERE showtime_id = ${showtimeId}
       AND user_id = ${userId}
-      AND seat_id IN ${sql(seatIds)}
+      AND seat_id IN ${db(seatIds)}
   `;
 
   return result.count;
 }
 
 export async function assertSeatsAvailableForBooking(
-  tx: typeof sql,
+  tx: SQL,
   showtimeId: string,
   userId: string,
   seatIds: string[],
@@ -304,7 +306,7 @@ export async function assertSeatsAvailableForBooking(
         FROM movie_booking_seats mbs
         JOIN movie_bookings mb ON mb.id = mbs.booking_id
         WHERE mbs.showtime_id = ${showtimeId}
-          AND mbs.seat_id IN ${sql(seatIds)}
+          AND mbs.seat_id IN ${tx(seatIds)}
           AND mb.status = 'confirmed'
           AND mbs.booking_id <> ${excludeBookingId}
       `
@@ -313,7 +315,7 @@ export async function assertSeatsAvailableForBooking(
         FROM movie_booking_seats mbs
         JOIN movie_bookings mb ON mb.id = mbs.booking_id
         WHERE mbs.showtime_id = ${showtimeId}
-          AND mbs.seat_id IN ${sql(seatIds)}
+          AND mbs.seat_id IN ${tx(seatIds)}
           AND mb.status = 'confirmed'
       `;
 
@@ -325,7 +327,7 @@ export async function assertSeatsAvailableForBooking(
     SELECT seat_id, user_id, locked_until
     FROM seat_locks
     WHERE showtime_id = ${showtimeId}
-      AND seat_id IN ${sql(seatIds)}
+      AND seat_id IN ${tx(seatIds)}
       AND locked_until > NOW()
   `;
 
@@ -337,7 +339,7 @@ export async function assertSeatsAvailableForBooking(
 }
 
 export async function releaseSeatLocksForBooking(
-  tx: typeof sql,
+  tx: SQL,
   showtimeId: string,
   userId: string,
   seatIds: string[],
@@ -346,6 +348,6 @@ export async function releaseSeatLocksForBooking(
     DELETE FROM seat_locks
     WHERE showtime_id = ${showtimeId}
       AND user_id = ${userId}
-      AND seat_id IN ${sql(seatIds)}
+      AND seat_id IN ${tx(seatIds)}
   `;
 }

@@ -1,21 +1,17 @@
-import {
-  findUserByEmailForAuth,
-  insertUser,
-} from '@/modules/users/repository/user.repository';
+import userRepository from '@/modules/users/repository/user.repository';
 import type {
   InsertUserPayload,
   UserAuthRecord,
   UserPublicRecord,
 } from '@/modules/users/types/user.types';
 
-export async function createUserRecord(
+const createUserRecord = async (
   payload: InsertUserPayload,
-): Promise<UserPublicRecord> {
-  return insertUser(payload);
-}
+): Promise<UserPublicRecord> => userRepository.insertUser(payload);
 
-export async function findUserRecordByEmail(
+const findUserRecordByEmail = async (
   email: string,
-): Promise<UserAuthRecord | null> {
-  return findUserByEmailForAuth(email.toLowerCase());
-}
+): Promise<UserAuthRecord | null> =>
+  userRepository.findUserByEmailForAuth(email.toLowerCase());
+
+export default { createUserRecord, findUserRecordByEmail };

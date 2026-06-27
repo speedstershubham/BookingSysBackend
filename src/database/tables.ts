@@ -1,4 +1,4 @@
-export const Tables = {
+const Tables = {
   USERS: 'users',
   BOOKINGS: 'bookings',
   SERVICES: 'services',
@@ -14,4 +14,4 @@ export const Tables = {
   MOVIE_BOOKING_SEATS: 'movie_booking_seats',
 } as const;
 
-export type TableName = (typeof Tables)[keyof typeof Tables];
+export default Tables;

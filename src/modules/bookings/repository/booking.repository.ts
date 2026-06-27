@@ -1,4 +1,4 @@
-import { sql } from '@/database/postgres';
+import { db } from '@/database/postgres';
 import {
   assertSeatsAvailableForBooking,
   releaseSeatLocksForBooking,
@@ -8,27 +8,15 @@ import type {
   CancelBookingResult,
 } from '@/modules/bookings/types/booking.types';
 
-const BOOKING_SELECT = sql`
-  mb.id AS booking_id,
-  st.id AS showtime_id,
-  m.title AS movie_title,
-  h.name AS hall_name,
-  st.start_time,
-  mb.status,
-  mb.refund_status,
-  mb.paid_amount::text AS paid_amount,
-  mb.cancelled_at,
-  mb.created_at,
-  se.id AS seat_id,
-  se.seat_number
-`;
+const BOOKING_SELECT =
+  'mb.id AS booking_id, st.id AS showtime_id, m.title AS movie_title, h.name AS hall_name, st.start_time, mb.status, mb.refund_status, mb.paid_amount::text AS paid_amount, mb.cancelled_at, mb.created_at, se.id AS seat_id, se.seat_number';
 
 export async function insertBooking(
   userId: string,
   showtimeId: string,
   seatIds: string[],
 ): Promise<string> {
-  return sql.begin(async (tx) => {
+  return db.begin(async (tx) => {
     const [showtime] = await tx<{ ticket_price: string }[]>`
       SELECT ticket_price::text AS ticket_price
       FROM showtimes
@@ -45,7 +33,7 @@ export async function insertBooking(
       FROM seats se
       JOIN showtimes st ON st.hall_id = se.hall_id
       WHERE st.id = ${showtimeId}
-        AND se.id IN ${sql(seatIds)}
+        AND se.id IN ${tx(seatIds)}
     `;
 
     if (seats.length !== seatIds.length) {
@@ -82,8 +70,9 @@ export async function insertBooking(
 export async function findUserBookings(
   userId: string,
 ): Promise<BookingDetailRow[]> {
-  return sql`
-    SELECT ${BOOKING_SELECT}
+
+  return db`
+    SELECT ${db.unsafe(BOOKING_SELECT)}
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
     JOIN movies m ON m.id = st.movie_id
@@ -99,8 +88,9 @@ export async function findBookingById(
   bookingId: string,
   userId: string,
 ): Promise<BookingDetailRow[]> {
-  return sql`
-    SELECT ${BOOKING_SELECT}
+
+  return db`
+    SELECT ${db.unsafe(BOOKING_SELECT)}
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
     JOIN movies m ON m.id = st.movie_id
@@ -117,7 +107,7 @@ export async function cancelBookingById(
   bookingId: string,
   userId: string,
 ): Promise<CancelBookingResult> {
-  return sql.begin(async (tx) => {
+  return db.begin(async (tx) => {
     const [booking] = await tx<
       {
         id: string;
@@ -179,7 +169,7 @@ export async function updateBookingSeats(
   bookingId: string,
   seatIds: string[],
 ): Promise<string> {
-  return sql.begin(async (tx) => {
+  return db.begin(async (tx) => {
     const [booking] = await tx<
       { id: string; showtime_id: string; status: string; start_time: Date }[]
     >`
@@ -210,7 +200,7 @@ export async function updateBookingSeats(
       FROM seats se
       JOIN showtimes st ON st.hall_id = se.hall_id
       WHERE st.id = ${showtimeId}
-        AND se.id IN ${sql(seatIds)}
+        AND se.id IN ${tx(seatIds)}
     `;
 
     if (seats.length !== seatIds.length) {

@@ -1,14 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { connectDB, sql } from '@/database/postgres';
+import { db } from '@/database/postgres';
 import { logger } from '@/core/logger/logger';
 
 const migrationsDir = path.join(import.meta.dir, 'migrations');
 
 export async function runMigrations(): Promise<void> {
-  await connectDB();
-
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS _migrations (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL UNIQUE,
@@ -20,7 +18,7 @@ export async function runMigrations(): Promise<void> {
     .filter((file) => file.endsWith('.sql'))
     .sort();
 
-  const applied = await sql<{ name: string }[]>`
+  const applied = await db<{ name: string }[]>`
     SELECT name FROM _migrations
   `;
   const appliedNames = new Set(applied.map((row) => row.name));
@@ -32,7 +30,7 @@ export async function runMigrations(): Promise<void> {
 
     const migration = await readFile(path.join(migrationsDir, file), 'utf-8');
 
-    await sql.begin(async (tx) => {
+    await db.begin(async (tx) => {
       await tx.unsafe(migration).simple();
       await tx`INSERT INTO _migrations (name) VALUES (${file})`;
     });

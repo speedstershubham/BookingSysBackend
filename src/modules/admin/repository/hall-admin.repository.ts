@@ -1,4 +1,6 @@
-import { sql } from '@/database/postgres';
+import type { SQL } from 'bun';
+
+import { db } from '@/database/postgres';
 import type {
   CreateHallInput,
   HallAdminRecord,
@@ -12,7 +14,7 @@ type HallRow = {
   theatre_name: string;
   name: string;
   capacity: number;
-  seat_count: string;
+  seat_count: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -24,7 +26,7 @@ function mapHall(row: HallRow): HallAdminRecord {
     theatreName: row.theatre_name,
     name: row.name,
     capacity: row.capacity,
-    seatCount: Number(row.seat_count),
+    seatCount: row.seat_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -36,27 +38,27 @@ export async function findHalls(
   const offset = (filters.page - 1) * filters.limit;
 
   const [countRow] = filters.theatreId
-    ? await sql<{ count: string }[]>`
-        SELECT COUNT(*)::text AS count
+    ? await db<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
         FROM halls
         WHERE theatre_id = ${filters.theatreId}
       `
-    : await sql<{ count: string }[]>`
-        SELECT COUNT(*)::text AS count
+    : await db<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
         FROM halls
       `;
 
-  const total = Number(countRow?.count ?? 0);
+  const total = countRow!.count;
 
   const rows = filters.theatreId
-    ? await sql<HallRow[]>`
+    ? await db<HallRow[]>`
         SELECT
           h.id,
           h.theatre_id,
           t.name AS theatre_name,
           h.name,
           h.capacity,
-          COUNT(se.id)::text AS seat_count,
+          COUNT(se.id)::int AS seat_count,
           h.created_at,
           h.updated_at
         FROM halls h
@@ -68,14 +70,14 @@ export async function findHalls(
         LIMIT ${filters.limit}
         OFFSET ${offset}
       `
-    : await sql<HallRow[]>`
+    : await db<HallRow[]>`
         SELECT
           h.id,
           h.theatre_id,
           t.name AS theatre_name,
           h.name,
           h.capacity,
-          COUNT(se.id)::text AS seat_count,
+          COUNT(se.id)::int AS seat_count,
           h.created_at,
           h.updated_at
         FROM halls h
@@ -96,14 +98,14 @@ export async function findHalls(
 export async function findHallAdminById(
   id: string,
 ): Promise<HallAdminRecord | null> {
-  const [row] = await sql<HallRow[]>`
+  const [row] = await db<HallRow[]>`
     SELECT
       h.id,
       h.theatre_id,
       t.name AS theatre_name,
       h.name,
       h.capacity,
-      COUNT(se.id)::text AS seat_count,
+      COUNT(se.id)::int AS seat_count,
       h.created_at,
       h.updated_at
     FROM halls h
@@ -118,7 +120,7 @@ export async function findHallAdminById(
 }
 
 async function generateSeatsForHall(
-  tx: typeof sql,
+  tx: SQL,
   hallId: string,
   capacity: number,
 ): Promise<void> {
@@ -131,7 +133,7 @@ async function generateSeatsForHall(
 }
 
 export async function insertHall(input: CreateHallInput): Promise<HallAdminRecord> {
-  const hallId = await sql.begin(async (tx) => {
+  const hallId = await db.begin(async (tx) => {
     const now = new Date();
     const [hall] = await tx<{ id: string }[]>`
       INSERT INTO halls (theatre_id, name, capacity, created_at, updated_at)
@@ -161,7 +163,7 @@ export async function updateHallById(
   id: string,
   input: UpdateHallInput,
 ): Promise<HallAdminRecord> {
-  await sql.begin(async (tx) => {
+  await db.begin(async (tx) => {
     const [existing] = await tx<
       { id: string; name: string; capacity: number }[]
     >`
@@ -235,7 +237,7 @@ export async function regenerateHallSeats(
   hallId: string,
   capacity?: number,
 ): Promise<HallAdminRecord> {
-  await sql.begin(async (tx) => {
+  await db.begin(async (tx) => {
     const [hall] = await tx<{ capacity: number }[]>`
       SELECT capacity
       FROM halls
@@ -249,8 +251,8 @@ export async function regenerateHallSeats(
 
     const targetCapacity = capacity ?? hall.capacity;
 
-    const booked = await tx<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count
+    const booked = await tx<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count
       FROM movie_booking_seats mbs
       JOIN showtimes st ON st.id = mbs.showtime_id
       JOIN seats se ON se.id = mbs.seat_id
@@ -258,7 +260,7 @@ export async function regenerateHallSeats(
         AND se.seat_number > ${targetCapacity}
     `;
 
-    if (Number(booked[0]?.count ?? 0) > 0) {
+    if (booked[0]!.count > 0) {
       throw new Error('SEATS_IN_USE');
     }
 
@@ -294,28 +296,28 @@ export async function regenerateHallSeats(
 export async function countHallShowtimeBookings(
   hallId: string,
 ): Promise<number> {
-  const [row] = await sql<{ count: string }[]>`
-    SELECT COUNT(DISTINCT mb.id)::text AS count
+  const [row] = await db<{ count: number }[]>`
+    SELECT COUNT(DISTINCT mb.id)::int AS count
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
     WHERE st.hall_id = ${hallId}
   `;
 
-  return Number(row?.count ?? 0);
+  return row!.count;
 }
 
 export async function countHallShowtimes(hallId: string): Promise<number> {
-  const [row] = await sql<{ count: string }[]>`
-    SELECT COUNT(*)::text AS count
+  const [row] = await db<{ count: number }[]>`
+    SELECT COUNT(*)::int AS count
     FROM showtimes
     WHERE hall_id = ${hallId}
   `;
 
-  return Number(row?.count ?? 0);
+  return row!.count;
 }
 
 export async function deleteHallById(id: string): Promise<boolean> {
-  const result = await sql`
+  const result = await db`
     DELETE FROM halls
     WHERE id = ${id}
   `;

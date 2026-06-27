@@ -1,11 +1,11 @@
-import { sql } from '@/database/postgres';
+import { db } from '@/database/postgres';
 
 export async function blacklistAccessToken(
   jti: string,
   userId: string,
   expiresAt: Date,
 ): Promise<void> {
-  await sql`
+  await db`
     INSERT INTO token_blacklist (jti, user_id, expires_at)
     VALUES (${jti}, ${userId}, ${expiresAt})
     ON CONFLICT (jti) DO NOTHING
@@ -13,7 +13,7 @@ export async function blacklistAccessToken(
 }
 
 export async function isAccessTokenBlacklisted(jti: string): Promise<boolean> {
-  const [row] = await sql<{ exists: boolean }[]>`
+  const [row] = await db<{ exists: boolean }[]>`
     SELECT EXISTS (
       SELECT 1
       FROM token_blacklist
@@ -30,7 +30,7 @@ export async function insertRefreshToken(
   tokenHash: string,
   expiresAt: Date,
 ): Promise<void> {
-  await sql`
+  await db`
     INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
     VALUES (${userId}, ${tokenHash}, ${expiresAt})
   `;
@@ -39,7 +39,7 @@ export async function insertRefreshToken(
 export async function findValidRefreshToken(
   tokenHash: string,
 ): Promise<{ userId: string; id: string } | null> {
-  const [row] = await sql<{ user_id: string; id: string }[]>`
+  const [row] = await db<{ user_id: string; id: string }[]>`
     SELECT user_id, id
     FROM refresh_tokens
     WHERE token_hash = ${tokenHash}
@@ -58,7 +58,7 @@ export async function findValidRefreshToken(
 export async function revokeRefreshTokenByHash(
   tokenHash: string,
 ): Promise<void> {
-  await sql`
+  await db`
     UPDATE refresh_tokens
     SET revoked_at = NOW()
     WHERE token_hash = ${tokenHash}
@@ -69,7 +69,7 @@ export async function revokeRefreshTokenByHash(
 export async function revokeAllUserRefreshTokens(
   userId: string,
 ): Promise<void> {
-  await sql`
+  await db`
     UPDATE refresh_tokens
     SET revoked_at = NOW()
     WHERE user_id = ${userId}
