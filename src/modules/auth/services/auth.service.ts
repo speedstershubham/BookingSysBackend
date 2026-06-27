@@ -14,10 +14,7 @@ import type {
   UserResponse,
 } from '@/modules/users/types/user.types';
 
-const toAuthResponse = (
-  user: UserResponse,
-  token: string,
-): AuthResponse => ({
+const toAuthResponse = (user: UserResponse, token: string): AuthResponse => ({
   user,
   token,
 });
@@ -53,10 +50,7 @@ const login = async (input: LoginInput): Promise<AuthResponse> => {
     throw new AppError(401, 'Invalid email or password');
   }
 
-  const isValidPassword = await bcrypt.compare(
-    input.password,
-    user.password,
-  );
+  const isValidPassword = await bcrypt.compare(input.password, user.password);
 
   if (!isValidPassword) {
     throw new AppError(401, 'Invalid email or password');
@@ -67,8 +61,7 @@ const login = async (input: LoginInput): Promise<AuthResponse> => {
   return toAuthResponse(toUserResponse(user), token);
 };
 
-const getAuthenticatedUser = async (
-  userId: string,
-): Promise<UserResponse> => userService.getUserById(userId);
+const getAuthenticatedUser = async (userId: string): Promise<UserResponse> =>
+  userService.getUserById(userId);
 
 export default { signup, login, getAuthenticatedUser };

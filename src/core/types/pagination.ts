@@ -1,4 +1,7 @@
-import type { PaginationParams, PaginatedResult } from '@/core/types/pagination.types';
+import type {
+  PaginationParams,
+  PaginatedResult,
+} from '@/core/types/pagination.types';
 
 const buildPagination = (
   params: PaginationParams,

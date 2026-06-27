@@ -10,10 +10,7 @@ import type {
 } from '@/database/database.types';
 import generateId from '@/core/utils/uuid';
 
-const insert = async ({
-  table,
-  data,
-}: InsertParams): Promise<InsertResult> => {
+const insert = async ({ table, data }: InsertParams): Promise<InsertResult> => {
   const db = await getDB();
   const id = generateId();
   data.id = id;

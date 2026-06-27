@@ -52,8 +52,8 @@ const createRouter = (routes: Route[]) => {
       }
 
       try {
-        const body = await  route.handler(req, params);
-        return body
+        const body = await route.handler(req, params);
+        return body;
       } catch (error) {
         if (error instanceof Error && error.message === 'Invalid JSON body') {
           return response.errorResponse(new AppError(400, 'Invalid JSON body'));
@@ -63,7 +63,9 @@ const createRouter = (routes: Route[]) => {
           return response.errorResponse(error);
         }
 
-        return response.errorResponse(new AppError(500, 'Internal server error'));
+        return response.errorResponse(
+          new AppError(500, 'Internal server error'),
+        );
       }
     }
 

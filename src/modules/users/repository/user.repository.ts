@@ -43,8 +43,6 @@ const createUser = async (
 const insertUser = async (
   payload: InsertUserPayload,
 ): Promise<UserPublicRecord> => {
-  
-
   const { id } = await database.insert({
     table: Tables.USERS,
     data: {

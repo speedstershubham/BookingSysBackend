@@ -2,10 +2,8 @@ import AppError from '@/core/errors/app-error';
 import type { SuccessPayload } from '@/core/http/http.types';
 import { ZodError } from 'zod';
 
-const jsonResponse = (
-  data: SuccessPayload,
-  status = 200,
-): Response => Response.json({ success: true, data }, { status });
+const jsonResponse = (data: SuccessPayload, status = 200): Response =>
+  Response.json({ success: true, data }, { status });
 
 const errorResponse = (error: Error): Response => {
   if (error instanceof AppError) {
