@@ -85,11 +85,9 @@ const findUserById = async (id: string): Promise<UserPublicRecord | null> => {
   return user ? mapPublicRow(user) : null;
 };
 
-const findUsers = async ({
-  params,
-}: {
-  params: PaginationParams;
-}): Promise<{ users: UserPublicRecord[]; total: number }> => {
+const findUsers = async (
+  params: PaginationParams,
+): Promise<{ users: UserPublicRecord[]; total: number }> => {
   const offset = (params.page - 1) * params.limit;
 
   const total = await database.count({ table: Tables.USERS });

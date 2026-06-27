@@ -50,7 +50,7 @@ const getUsers = async (
   const { users, total } = await userRepository.findUsers(params);
 
   return {
-    items: users.map(toUserResponse),
+    items: users,
     pagination: pagination.buildPagination(params, total),
   };
 };
