@@ -64,16 +64,7 @@ const login = async (input: LoginInput): Promise<AuthResponse> => {
 
   const token = jwt.signToken({ userId: user.id, email: user.email });
 
-  return toAuthResponse(
-    {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    },
-    token,
-  );
+  return toAuthResponse(toUserResponse(user), token);
 };
 
 const getAuthenticatedUser = async (
