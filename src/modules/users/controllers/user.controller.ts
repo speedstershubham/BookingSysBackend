@@ -1,21 +1,21 @@
-import { AppError } from '@/core/errors/app-error';
-import { withAuth } from '@/core/auth/auth.middleware';
-import { jsonResponse } from '@/core/http/response';
-import {
-  userIdSchema,
-} from '@/modules/users/validations/user.validation';
-import {
-  getUserById,
-} from '@/modules/users/services/user.service';
+import AppError from '@/core/errors/app-error';
+import authMiddleware from '@/core/auth/auth.middleware';
+import response from '@/core/http/response';
+import userService from '@/modules/users/services/user.service';
+import userValidation from '@/modules/users/validations/user.validation';
 
-export const getUserHandler = withAuth(async (_req, params, auth) => {
-  const { id } = userIdSchema.parse(params);
+const getUserHandler = authMiddleware.withAuth(async (_req, params, auth) => {
+  const { id } = userValidation.userIdSchema.parse(params);
 
   if (auth.userId !== id) {
     throw new AppError(403, 'Forbidden');
   }
 
-  const user = await getUserById(id);
+  const user = await userService.getUserById(id);
 
-  return jsonResponse(user);
+  return response.jsonResponse(user);
 });
+
+export default {
+  getUserHandler,
+};

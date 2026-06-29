@@ -1,26 +1,11 @@
-import { AppError } from '@/core/errors/app-error';
-import { isUniqueViolation } from '@/core/errors/postgres-error';
-import {
-  buildPagination,
-  type PaginatedResult,
-  type PaginationParams,
-} from '@/core/types/pagination';
-import {
-  deleteMovieById,
-  deleteShowtimeById,
-  findHallById,
-  findMovieById,
-  findMovieDurationMinutes,
-  findMovies,
-  findShowtimeById,
-  findShowtimeDetailById,
-  findShowtimesByMovieId,
-  insertMovie,
-  insertShowtime,
-  countShowtimeBookings,
-  updateMovieById,
-  updateShowtimeById,
-} from '@/modules/movies/repository/movie.repository';
+import AppError from '@/core/errors/app-error';
+import postgresError from '@/core/errors/postgres-error';
+import pagination from '@/core/types/pagination';
+import type {
+  PaginatedResult,
+  PaginationParams,
+} from '@/core/types/pagination.types';
+import movieRepository from '@/modules/movies/repository/movie.repository';
 import type {
   HallRecord,
   CreateMovieInput,
@@ -35,107 +20,100 @@ import type {
   UpdateShowtimeInput,
 } from '@/modules/movies/types/movie.types';
 
-export async function getMovies(
+const getMovies = async (
   params: PaginationParams,
-): Promise<PaginatedResult<MovieResponse>> {
-  const { movies, total } = await findMovies(params);
+): Promise<PaginatedResult<MovieResponse>> => {
+  const { movies, total } = await movieRepository.findMovies(params);
 
   return {
     items: movies,
-    pagination: buildPagination(params, total),
+    pagination: pagination.buildPagination(params, total),
   };
-}
+};
 
-export async function getMovieById(
-  id: string,
-): Promise<MovieDetailResponse> {
-  const movie = await findMovieById(id);
+const getMovieById = async (id: string): Promise<MovieDetailResponse> => {
+  const movie = await movieRepository.findMovieById(id);
 
   if (!movie) {
     throw new AppError(404, 'Movie not found');
   }
 
   return movie;
-}
+};
 
-export async function getShowtimesByMovieId(
+const getShowtimesByMovieId = async (
   movieId: string,
-): Promise<HallSummary[]> {
+): Promise<HallSummary[]> => {
   await getMovieById(movieId);
-  return findShowtimesByMovieId(movieId);
-}
+  return movieRepository.findShowtimesByMovieId(movieId);
+};
 
-export async function getShowtimeById(
-  id: string,
-): Promise<ShowtimeRecord> {
-  const showtime = await findShowtimeById(id);
+const getShowtimeById = async (id: string): Promise<ShowtimeRecord> => {
+  const showtime = await movieRepository.findShowtimeById(id);
 
   if (!showtime) {
     throw new AppError(404, 'Showtime not found');
   }
 
   return showtime;
-}
+};
 
-export async function getHallById(id: string): Promise<HallRecord> {
-  const hall = await findHallById(id);
+const getHallById = async (id: string): Promise<HallRecord> => {
+  const hall = await movieRepository.findHallById(id);
 
   if (!hall) {
     throw new AppError(404, 'Hall not found');
   }
 
   return hall;
-}
+};
 
-export async function getShowtimeDetail(
+const getShowtimeDetail = async (
   id: string,
-): Promise<ShowtimeDetailResponse> {
-  const showtime = await findShowtimeDetailById(id);
+): Promise<ShowtimeDetailResponse> => {
+  const showtime = await movieRepository.findShowtimeDetailById(id);
 
   if (!showtime) {
     throw new AppError(404, 'Showtime not found');
   }
 
   return showtime;
-}
+};
 
-export async function createMovie(
-  input: CreateMovieInput,
-): Promise<MovieRecord> {
-  return insertMovie(input);
-}
+const createMovie = async (input: CreateMovieInput): Promise<MovieRecord> =>
+  movieRepository.insertMovie(input);
 
-export async function updateMovie(
+const updateMovie = async (
   id: string,
   input: UpdateMovieInput,
-): Promise<MovieRecord> {
-  const movie = await updateMovieById(id, input);
+): Promise<MovieRecord> => {
+  const movie = await movieRepository.updateMovieById(id, input);
 
   if (!movie) {
     throw new AppError(404, 'Movie not found');
   }
 
   return movie;
-}
+};
 
-export async function deleteMovie(id: string): Promise<void> {
-  const deleted = await deleteMovieById(id);
+const deleteMovie = async (id: string): Promise<void> => {
+  const deleted = await movieRepository.deleteMovieById(id);
 
   if (!deleted) {
     throw new AppError(404, 'Movie not found');
   }
-}
+};
 
-export async function createShowtime(
+const createShowtime = async (
   input: CreateShowtimeInput,
-): Promise<ShowtimeRecord> {
-  const movie = await findMovieById(input.movieId);
+): Promise<ShowtimeRecord> => {
+  const movie = await movieRepository.findMovieById(input.movieId);
 
   if (!movie) {
     throw new AppError(404, 'Movie not found');
   }
 
-  const hall = await findHallById(input.hallId);
+  const hall = await movieRepository.findHallById(input.hallId);
 
   if (!hall) {
     throw new AppError(404, 'Hall not found');
@@ -150,7 +128,7 @@ export async function createShowtime(
   }
 
   try {
-    return await insertShowtime(
+    return await movieRepository.insertShowtime(
       input.movieId,
       input.hallId,
       input.startTime,
@@ -158,7 +136,7 @@ export async function createShowtime(
       input.ticketPrice ?? 500,
     );
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(
         409,
         'A showtime already exists for this movie, hall, and start time',
@@ -167,23 +145,23 @@ export async function createShowtime(
 
     throw error;
   }
-}
+};
 
-export async function updateShowtime(
+const updateShowtime = async (
   id: string,
   input: UpdateShowtimeInput,
-): Promise<ShowtimeRecord> {
+): Promise<ShowtimeRecord> => {
   if (Object.keys(input).length === 0) {
     throw new AppError(400, 'No fields to update');
   }
 
-  const existing = await findShowtimeById(id);
+  const existing = await movieRepository.findShowtimeById(id);
 
   if (!existing) {
     throw new AppError(404, 'Showtime not found');
   }
 
-  const bookingCount = await countShowtimeBookings(id);
+  const bookingCount = await movieRepository.countShowtimeBookings(id);
 
   if (input.hallId && input.hallId !== existing.hallId) {
     if (bookingCount > 0) {
@@ -193,7 +171,7 @@ export async function updateShowtime(
       );
     }
 
-    const hall = await findHallById(input.hallId);
+    const hall = await movieRepository.findHallById(input.hallId);
 
     if (!hall) {
       throw new AppError(404, 'Hall not found');
@@ -204,7 +182,9 @@ export async function updateShowtime(
   let endTime = existing.endTime;
 
   if (input.startTime) {
-    const durationMinutes = await findMovieDurationMinutes(existing.movieId);
+    const durationMinutes = await movieRepository.findMovieDurationMinutes(
+      existing.movieId,
+    );
 
     if (!durationMinutes) {
       throw new AppError(404, 'Movie not found');
@@ -221,7 +201,7 @@ export async function updateShowtime(
   const ticketPrice = input.ticketPrice ?? existing.ticketPrice;
 
   try {
-    const showtime = await updateShowtimeById(id, {
+    const showtime = await movieRepository.updateShowtimeById(id, {
       hallId,
       startTime,
       endTime,
@@ -234,7 +214,7 @@ export async function updateShowtime(
 
     return showtime;
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(
         409,
         'A showtime already exists for this movie, hall, and start time',
@@ -243,23 +223,35 @@ export async function updateShowtime(
 
     throw error;
   }
-}
+};
 
-export async function deleteShowtime(id: string): Promise<void> {
+const deleteShowtime = async (id: string): Promise<void> => {
   await getShowtimeById(id);
 
-  const bookingCount = await countShowtimeBookings(id);
+  const bookingCount = await movieRepository.countShowtimeBookings(id);
 
   if (bookingCount > 0) {
-    throw new AppError(
-      409,
-      'Cannot delete showtime with existing bookings',
-    );
+    throw new AppError(409, 'Cannot delete showtime with existing bookings');
   }
 
-  const deleted = await deleteShowtimeById(id);
+  const deleted = await movieRepository.deleteShowtimeById(id);
 
   if (!deleted) {
     throw new AppError(404, 'Showtime not found');
   }
-}
+};
+
+export default {
+  getMovies,
+  getMovieById,
+  getShowtimesByMovieId,
+  getShowtimeById,
+  getHallById,
+  getShowtimeDetail,
+  createMovie,
+  updateMovie,
+  deleteMovie,
+  createShowtime,
+  updateShowtime,
+  deleteShowtime,
+};

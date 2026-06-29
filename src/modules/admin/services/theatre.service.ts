@@ -1,14 +1,6 @@
-import { AppError } from '@/core/errors/app-error';
-import { isUniqueViolation } from '@/core/errors/postgres-error';
-import {
-  countTheatreHalls,
-  deleteTheatreById,
-  findTheatreById,
-  findTheatreWithHalls,
-  findTheatres,
-  insertTheatre,
-  updateTheatreById,
-} from '@/modules/admin/repository/theatre.repository';
+import AppError from '@/core/errors/app-error';
+import postgresError from '@/core/errors/postgres-error';
+import theatreRepository from '@/modules/admin/repository/theatre.repository';
 import type {
   CreateTheatreInput,
   TheatreRecord,
@@ -16,40 +8,39 @@ import type {
   UpdateTheatreInput,
 } from '@/modules/admin/types/admin.types';
 
-export async function getTheatres(): Promise<TheatreRecord[]> {
-  return findTheatres();
-}
+const getTheatres = async (): Promise<TheatreRecord[]> =>
+  theatreRepository.findTheatres();
 
-export async function getTheatreById(id: string): Promise<TheatreWithHalls> {
-  const theatre = await findTheatreWithHalls(id);
+const getTheatreById = async (id: string): Promise<TheatreWithHalls> => {
+  const theatre = await theatreRepository.findTheatreWithHalls(id);
 
   if (!theatre) {
     throw new AppError(404, 'Theatre not found');
   }
 
   return theatre;
-}
+};
 
-export async function createTheatre(
+const createTheatre = async (
   input: CreateTheatreInput,
-): Promise<TheatreRecord> {
+): Promise<TheatreRecord> => {
   try {
-    return await insertTheatre(input);
+    return await theatreRepository.insertTheatre(input);
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'A theatre with this name already exists');
     }
 
     throw error;
   }
-}
+};
 
-export async function updateTheatre(
+const updateTheatre = async (
   id: string,
   input: UpdateTheatreInput,
-): Promise<TheatreRecord> {
+): Promise<TheatreRecord> => {
   try {
-    const theatre = await updateTheatreById(id, input);
+    const theatre = await theatreRepository.updateTheatreById(id, input);
 
     if (!theatre) {
       throw new AppError(404, 'Theatre not found');
@@ -57,18 +48,18 @@ export async function updateTheatre(
 
     return theatre;
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'A theatre with this name already exists');
     }
 
     throw error;
   }
-}
+};
 
-export async function deleteTheatre(id: string): Promise<void> {
+const deleteTheatre = async (id: string): Promise<void> => {
   await getTheatreById(id);
 
-  const hallCount = await countTheatreHalls(id);
+  const hallCount = await theatreRepository.countTheatreHalls(id);
 
   if (hallCount > 0) {
     throw new AppError(
@@ -77,17 +68,26 @@ export async function deleteTheatre(id: string): Promise<void> {
     );
   }
 
-  const deleted = await deleteTheatreById(id);
+  const deleted = await theatreRepository.deleteTheatreById(id);
 
   if (!deleted) {
     throw new AppError(404, 'Theatre not found');
   }
-}
+};
 
-export async function assertTheatreExists(id: string): Promise<void> {
-  const theatre = await findTheatreById(id);
+const assertTheatreExists = async (id: string): Promise<void> => {
+  const theatre = await theatreRepository.findTheatreById(id);
 
   if (!theatre) {
     throw new AppError(404, 'Theatre not found');
   }
-}
+};
+
+export default {
+  getTheatres,
+  getTheatreById,
+  createTheatre,
+  updateTheatre,
+  deleteTheatre,
+  assertTheatreExists,
+};

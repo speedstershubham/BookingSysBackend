@@ -1,11 +1,11 @@
 import bcrypt from 'bcrypt';
-import { AppError } from '@/core/errors/app-error';
-import { isUniqueViolation } from '@/core/errors/postgres-error';
-import {
-  buildPagination,
-  type PaginatedResult,
-  type PaginationParams,
-} from '@/core/types/pagination';
+import AppError from '@/core/errors/app-error';
+import postgresError from '@/core/errors/postgres-error';
+import pagination from '@/core/types/pagination';
+import type {
+  PaginatedResult,
+  PaginationParams,
+} from '@/core/types/pagination.types';
 import userRepository from '@/modules/users/repository/user.repository';
 import type {
   CreateUserInput,
@@ -13,22 +13,18 @@ import type {
   UserResponse,
 } from '@/modules/users/types/user.types';
 
-function toUserResponse(user: UserPublicRecord): UserResponse {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    isBanned: user.isBanned,
-    bannedAt: user.bannedAt,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-}
+const toUserResponse = (user: UserPublicRecord): UserResponse => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  isBanned: user.isBanned,
+  bannedAt: user.bannedAt,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
 
-export async function createUser(
-  input: CreateUserInput,
-): Promise<UserResponse> {
+const createUser = async (input: CreateUserInput): Promise<UserResponse> => {
   const now = new Date();
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
@@ -43,15 +39,15 @@ export async function createUser(
 
     return toUserResponse(user);
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
     }
 
     throw error;
   }
-}
+};
 
-export async function getUserById(id: string): Promise<UserResponse> {
+const getUserById = async (id: string): Promise<UserResponse> => {
   const user = await userRepository.findUserById(id);
 
   if (!user) {
@@ -59,15 +55,21 @@ export async function getUserById(id: string): Promise<UserResponse> {
   }
 
   return toUserResponse(user);
-}
+};
 
-export async function getUsers(
+const getUsers = async (
   params: PaginationParams,
-): Promise<PaginatedResult<UserResponse>> {
+): Promise<PaginatedResult<UserResponse>> => {
   const { users, total } = await userRepository.findUsers(params);
 
   return {
     items: users.map(toUserResponse),
-    pagination: buildPagination(params, total),
+    pagination: pagination.buildPagination(params, total),
   };
-}
+};
+
+export default {
+  createUser,
+  getUserById,
+  getUsers,
+};

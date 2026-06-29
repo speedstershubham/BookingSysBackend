@@ -1,4 +1,4 @@
-import { db } from '@/database/postgres';
+import getDB from '@/database/postgres';
 import type {
   AdminBookingRecord,
   BookingsReport,
@@ -11,6 +11,8 @@ import type {
   RevenueReport,
   RevenueReportFilters,
 } from '@/modules/admin/types/admin.types';
+
+const db = await getDB();
 
 type AdminBookingRow = {
   booking_id: string;
@@ -32,7 +34,7 @@ type AdminBookingRow = {
   seat_number: number | null;
 };
 
-function groupBookingRows(rows: AdminBookingRow[]): AdminBookingRecord[] {
+const groupBookingRows = (rows: AdminBookingRow[]): AdminBookingRecord[] => {
   const bookings = new Map<string, AdminBookingRecord>();
 
   for (const row of rows) {
@@ -57,9 +59,10 @@ function groupBookingRows(rows: AdminBookingRow[]): AdminBookingRecord[] {
         seatCount: row.seat_id ? 1 : 0,
         ticketPrice,
         totalAmount: row.seat_id ? ticketPrice : Number(row.paid_amount),
-        seats: row.seat_id && row.seat_number
-          ? [{ id: row.seat_id, seatNumber: row.seat_number }]
-          : [],
+        seats:
+          row.seat_id && row.seat_number
+            ? [{ id: row.seat_id, seatNumber: row.seat_number }]
+            : [],
         createdAt: row.created_at,
       });
       continue;
@@ -73,11 +76,11 @@ function groupBookingRows(rows: AdminBookingRow[]): AdminBookingRecord[] {
   }
 
   return [...bookings.values()];
-}
+};
 
-export async function findAllBookings(
+const findAllBookings = async (
   filters: ListBookingsFilters,
-): Promise<{ bookings: AdminBookingRecord[]; total: number }> {
+): Promise<{ bookings: AdminBookingRecord[]; total: number }> => {
   const offset = (filters.page - 1) * filters.limit;
   const userId = filters.userId ?? null;
   const showtimeId = filters.showtimeId ?? null;
@@ -133,11 +136,11 @@ export async function findAllBookings(
     bookings: groupBookingRows(rows),
     total: countRow!.count,
   };
-}
+};
 
-export async function findAdminBookingById(
+const findAdminBookingById = async (
   bookingId: string,
-): Promise<AdminBookingRecord | null> {
+): Promise<AdminBookingRecord | null> => {
   const rows = await db<AdminBookingRow[]>`
     SELECT
       mb.id AS booking_id,
@@ -174,11 +177,11 @@ export async function findAdminBookingById(
   }
 
   return groupBookingRows(rows)[0] ?? null;
-}
+};
 
-export async function getRevenueReport(
+const getRevenueReport = async (
   filters: RevenueReportFilters,
-): Promise<RevenueReport> {
+): Promise<RevenueReport> => {
   const from = filters.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const to = filters.to ?? new Date();
 
@@ -274,11 +277,11 @@ export async function getRevenueReport(
       }),
     ),
   };
-}
+};
 
-export async function getOccupancyReport(
+const getOccupancyReport = async (
   filters: OccupancyReportFilters,
-): Promise<OccupancyReport> {
+): Promise<OccupancyReport> => {
   const movieId = filters.movieId ?? null;
   const from = filters.from ?? null;
   const to = filters.to ?? null;
@@ -339,9 +342,11 @@ export async function getOccupancyReport(
       };
     }),
   };
-}
+};
 
-function bookingsReportTrunc(groupBy: BookingsReportFilters['groupBy']): string {
+const bookingsReportTrunc = (
+  groupBy: BookingsReportFilters['groupBy'],
+): string => {
   switch (groupBy) {
     case 'week':
       return 'week';
@@ -350,11 +355,11 @@ function bookingsReportTrunc(groupBy: BookingsReportFilters['groupBy']): string 
     default:
       return 'day';
   }
-}
+};
 
-export async function getBookingsReport(
+const getBookingsReport = async (
   filters: BookingsReportFilters,
-): Promise<BookingsReport> {
+): Promise<BookingsReport> => {
   const from = filters.from ?? null;
   const to = filters.to ?? null;
   const userId = filters.userId ?? null;
@@ -391,4 +396,12 @@ export async function getBookingsReport(
       seatsSold: row.seats_sold,
     })),
   };
-}
+};
+
+export default {
+  findAllBookings,
+  findAdminBookingById,
+  getRevenueReport,
+  getOccupancyReport,
+  getBookingsReport,
+};

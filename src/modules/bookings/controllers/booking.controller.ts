@@ -1,52 +1,60 @@
-import { withAuth } from '@/core/auth/auth.middleware';
-import { parseJsonBody } from '@/core/http/request';
-import { jsonResponse } from '@/core/http/response';
-import {
-  bookingIdSchema,
-  createBookingSchema,
-  updateBookingSchema,
-} from '@/modules/bookings/validations/booking.validation';
-import {
-  cancelBooking,
-  createBooking,
-  getBookingById,
-  getMyBookings,
-  updateBooking,
-} from '@/modules/bookings/services/booking.service';
+import authMiddleware from '@/core/auth/auth.middleware';
+import request from '@/core/http/request';
+import response from '@/core/http/response';
+import bookingService from '@/modules/bookings/services/booking.service';
+import bookingValidation from '@/modules/bookings/validations/booking.validation';
 
-export const createBookingHandler = withAuth(async (req, _params, auth) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = createBookingSchema.parse(body);
-  const booking = await createBooking(auth.userId, input);
+const createBookingHandler = authMiddleware.withAuth(
+  async (req, _params, auth) => {
+    const body = await request.parseJsonBody(req);
+    const input = bookingValidation.createBookingSchema.parse(body);
+    const booking = await bookingService.createBooking(auth.userId, input);
 
-  return jsonResponse(booking, 201);
-});
+    return response.jsonResponse(booking, 201);
+  },
+);
 
-export const getMyBookingsHandler = withAuth(async (_req, _params, auth) => {
-  const bookings = await getMyBookings(auth.userId);
+const getMyBookingsHandler = authMiddleware.withAuth(
+  async (_req, _params, auth) => {
+    const bookings = await bookingService.getMyBookings(auth.userId);
 
-  return jsonResponse(bookings);
-});
+    return response.jsonResponse(bookings);
+  },
+);
 
-export const getBookingByIdHandler = withAuth(async (_req, params, auth) => {
-  const { id } = bookingIdSchema.parse(params);
-  const booking = await getBookingById(auth.userId, id);
+const getBookingByIdHandler = authMiddleware.withAuth(
+  async (_req, params, auth) => {
+    const { id } = bookingValidation.bookingIdSchema.parse(params);
+    const booking = await bookingService.getBookingById(auth.userId, id);
 
-  return jsonResponse(booking);
-});
+    return response.jsonResponse(booking);
+  },
+);
 
-export const updateBookingHandler = withAuth(async (req, params, auth) => {
-  const { id } = bookingIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateBookingSchema.parse(body);
-  const booking = await updateBooking(auth.userId, id, input);
+const updateBookingHandler = authMiddleware.withAuth(
+  async (req, params, auth) => {
+    const { id } = bookingValidation.bookingIdSchema.parse(params);
+    const body = await request.parseJsonBody(req);
+    const input = bookingValidation.updateBookingSchema.parse(body);
+    const booking = await bookingService.updateBooking(auth.userId, id, input);
 
-  return jsonResponse(booking);
-});
+    return response.jsonResponse(booking);
+  },
+);
 
-export const cancelBookingHandler = withAuth(async (_req, params, auth) => {
-  const { id } = bookingIdSchema.parse(params);
-  const result = await cancelBooking(auth.userId, id);
+const cancelBookingHandler = authMiddleware.withAuth(
+  async (_req, params, auth) => {
+    const { id } = bookingValidation.bookingIdSchema.parse(params);
+    const result = await bookingService.cancelBooking(auth.userId, id);
 
-  return jsonResponse(result);
-});
+    return response.jsonResponse(result);
+  },
+);
+
+export default {
+  createBookingHandler,
+  getMyBookingsHandler,
+  getBookingByIdHandler,
+  updateBookingHandler,
+  cancelBookingHandler,
+};

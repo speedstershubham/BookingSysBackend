@@ -1,15 +1,7 @@
-import { AppError } from '@/core/errors/app-error';
-import {
-  buildPagination,
-  type PaginatedResult,
-} from '@/core/types/pagination';
-import {
-  findAdminBookingById,
-  findAllBookings,
-  getBookingsReport,
-  getOccupancyReport,
-  getRevenueReport,
-} from '@/modules/admin/repository/admin-booking.repository';
+import pagination from '@/core/types/pagination';
+import type { PaginatedResult } from '@/core/types/pagination.types';
+import AppError from '@/core/errors/app-error';
+import adminBookingRepository from '@/modules/admin/repository/admin-booking.repository';
 import type {
   AdminBookingRecord,
   BookingsReport,
@@ -21,43 +13,47 @@ import type {
   RevenueReportFilters,
 } from '@/modules/admin/types/admin.types';
 
-export async function getAllBookings(
+const getAllBookings = async (
   filters: ListBookingsFilters,
-): Promise<PaginatedResult<AdminBookingRecord>> {
-  const { bookings, total } = await findAllBookings(filters);
+): Promise<PaginatedResult<AdminBookingRecord>> => {
+  const { bookings, total } =
+    await adminBookingRepository.findAllBookings(filters);
 
   return {
     items: bookings,
-    pagination: buildPagination(filters, total),
+    pagination: pagination.buildPagination(filters, total),
   };
-}
+};
 
-export async function getAdminBookingById(
+const getAdminBookingById = async (
   bookingId: string,
-): Promise<AdminBookingRecord> {
-  const booking = await findAdminBookingById(bookingId);
+): Promise<AdminBookingRecord> => {
+  const booking = await adminBookingRepository.findAdminBookingById(bookingId);
 
   if (!booking) {
     throw new AppError(404, 'Booking not found');
   }
 
   return booking;
-}
+};
 
-export async function getRevenueReportData(
+const getRevenueReportData = async (
   filters: RevenueReportFilters,
-): Promise<RevenueReport> {
-  return getRevenueReport(filters);
-}
+): Promise<RevenueReport> => adminBookingRepository.getRevenueReport(filters);
 
-export async function getOccupancyReportData(
+const getOccupancyReportData = async (
   filters: OccupancyReportFilters,
-): Promise<OccupancyReport> {
-  return getOccupancyReport(filters);
-}
+): Promise<OccupancyReport> =>
+  adminBookingRepository.getOccupancyReport(filters);
 
-export async function getBookingsReportData(
+const getBookingsReportData = async (
   filters: BookingsReportFilters,
-): Promise<BookingsReport> {
-  return getBookingsReport(filters);
-}
+): Promise<BookingsReport> => adminBookingRepository.getBookingsReport(filters);
+
+export default {
+  getAllBookings,
+  getAdminBookingById,
+  getRevenueReportData,
+  getOccupancyReportData,
+  getBookingsReportData,
+};

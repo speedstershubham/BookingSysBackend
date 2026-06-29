@@ -1,42 +1,35 @@
-import type { Route } from '@/core/router/router';
-import {
-  loginHandler,
-  logoutHandler,
-  meHandler,
-  refreshHandler,
-  signupHandler,
-  updateProfileHandler,
-} from '@/modules/auth/controllers/auth.controller';
+import type { Route } from '@/core/router/router.types';
+import authController from '@/modules/auth/controllers/auth.controller';
 
-export const authRoutes: Route[] = [
+export default [
   {
     method: 'POST',
     path: '/api/auth/signup',
-    handler: signupHandler,
+    handler: authController.signupHandler,
   },
   {
     method: 'POST',
     path: '/api/auth/login',
-    handler: loginHandler,
+    handler: authController.loginHandler,
   },
   {
     method: 'POST',
     path: '/api/auth/refresh',
-    handler: refreshHandler,
+    handler: authController.refreshHandler,
   },
   {
     method: 'POST',
     path: '/api/auth/logout',
-    handler: logoutHandler,
+    handler: authController.logoutHandler,
   },
   {
     method: 'GET',
     path: '/api/auth/me',
-    handler: meHandler,
+    handler: authController.meHandler,
   },
   {
     method: 'PATCH',
     path: '/api/auth/me',
-    handler: updateProfileHandler,
+    handler: authController.updateProfileHandler,
   },
-];
+] satisfies Route[];

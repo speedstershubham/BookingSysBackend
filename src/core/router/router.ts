@@ -1,21 +1,13 @@
-import { errorResponse } from '@/core/http/response';
-import { AppError } from '@/core/errors/app-error';
+import AppError from '@/core/errors/app-error';
+import response from '@/core/http/response';
+import type { Route } from '@/core/router/router.types';
 
-export type RouteHandler = (
-  req: Request,
-  params: Record<string, string>,
-) => Promise<Response>;
+const { errorResponse } = response;
 
-export type Route = {
-  method: string;
-  path: string;
-  handler: RouteHandler;
-};
-
-function matchRoute(
+const matchRoute = (
   pattern: string,
   pathname: string,
-): Record<string, string> | null {
+): Record<string, string> | null => {
   const patternParts = pattern.split('/').filter(Boolean);
   const pathParts = pathname.split('/').filter(Boolean);
 
@@ -44,10 +36,11 @@ function matchRoute(
   }
 
   return params;
-}
+};
 
-export function createRouter(routes: Route[]) {
-  return async (req: Request): Promise<Response | null> => {
+const createRouter =
+  (routes: Route[]) =>
+  async (req: Request): Promise<Response | null> => {
     const url = new URL(req.url);
 
     for (const route of routes) {
@@ -68,10 +61,15 @@ export function createRouter(routes: Route[]) {
           return errorResponse(new AppError(400, 'Invalid JSON body'));
         }
 
-        return errorResponse(error);
+        if (error instanceof Error) {
+          return errorResponse(error);
+        }
+
+        return errorResponse(new Error('Internal server error'));
       }
     }
 
     return null;
   };
-}
+
+export default createRouter;

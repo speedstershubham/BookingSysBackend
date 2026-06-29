@@ -17,10 +17,7 @@ const getWhereEntry = (where: DbRow): [string, DbValue] => {
   return entry!;
 };
 
-const insert = async ({
-  table,
-  data,
-}: InsertParams): Promise<InsertResult> => {
+const insert = async ({ table, data }: InsertParams): Promise<InsertResult> => {
   const id = generateId();
   data.id = id;
   await db`

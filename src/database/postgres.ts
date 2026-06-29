@@ -1,5 +1,5 @@
 import { SQL } from 'bun';
-import { env } from '@/config/env';
+import env from '@/config/env';
 
 let sql: SQL | undefined;
 let connectPromise: Promise<SQL> | undefined;

@@ -1,5 +1,7 @@
-import type { Route } from '@/core/router/router';
-import {
+import type { Route } from '@/core/router/router.types';
+import adminController from '@/modules/admin/controllers/admin.controller';
+
+const {
   createHallHandler,
   createTheatreHandler,
   deleteHallHandler,
@@ -20,9 +22,9 @@ import {
   updateTheatreHandler,
   updateUserBanHandler,
   updateUserRoleHandler,
-} from '@/modules/admin/controllers/admin.controller';
+} = adminController;
 
-export const adminRoutes: Route[] = [
+export default [
   {
     method: 'GET',
     path: '/api/admin/theatres',
@@ -123,4 +125,4 @@ export const adminRoutes: Route[] = [
     path: '/api/admin/users/:id/ban',
     handler: updateUserBanHandler,
   },
-];
+] satisfies Route[];

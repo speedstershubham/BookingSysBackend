@@ -1,20 +1,11 @@
 import bcrypt from 'bcrypt';
-import { env } from '@/config/env';
-import { signAccessToken } from '@/core/auth/jwt';
-import {
-  generateRefreshToken,
-  hashToken,
-} from '@/core/auth/token.utils';
-import { AppError } from '@/core/errors/app-error';
-import { isUniqueViolation } from '@/core/errors/postgres-error';
+import env from '@/config/env';
+import jwt from '@/core/auth/jwt';
+import tokenUtils from '@/core/auth/token.utils';
+import AppError from '@/core/errors/app-error';
+import postgresError from '@/core/errors/postgres-error';
 import authRepository from '@/modules/auth/repository/auth.repository';
-import {
-  blacklistAccessToken,
-  insertRefreshToken,
-  findValidRefreshToken,
-  revokeAllUserRefreshTokens,
-  revokeRefreshTokenByHash,
-} from '@/modules/auth/repository/token.repository';
+import tokenRepository from '@/modules/auth/repository/token.repository';
 import type {
   AuthResponse,
   LoginInput,
@@ -24,10 +15,10 @@ import type {
   UpdateProfileInput,
 } from '@/modules/auth/types/auth.types';
 import userRepository from '@/modules/users/repository/user.repository';
-import { getUserById } from '@/modules/users/services/user.service';
+import userService from '@/modules/users/services/user.service';
 import type { UserResponse } from '@/modules/users/types/user.types';
 
-function parseDurationMs(duration: string): number {
+const parseDurationMs = (duration: string): number => {
   const match = duration.match(/^(\d+)([smhd])$/);
 
   if (!match) {
@@ -49,23 +40,22 @@ function parseDurationMs(duration: string): number {
     default:
       return 7 * 24 * 60 * 60 * 1000;
   }
-}
+};
 
-function refreshTokenExpiresAt(): Date {
-  return new Date(Date.now() + parseDurationMs(env.JWT_REFRESH_EXPIRES_IN));
-}
+const refreshTokenExpiresAt = (): Date =>
+  new Date(Date.now() + parseDurationMs(env.JWT_REFRESH_EXPIRES_IN));
 
-async function issueAuthTokens(user: UserResponse): Promise<AuthResponse> {
-  const access = signAccessToken({
+const issueAuthTokens = async (user: UserResponse): Promise<AuthResponse> => {
+  const access = jwt.signAccessToken({
     userId: user.id,
     email: user.email,
     role: user.role as 'user' | 'admin',
   });
 
-  const refreshToken = generateRefreshToken();
-  await insertRefreshToken(
+  const refreshToken = tokenUtils.generateRefreshToken();
+  await tokenRepository.insertRefreshToken(
     user.id,
-    hashToken(refreshToken),
+    tokenUtils.hashToken(refreshToken),
     refreshTokenExpiresAt(),
   );
 
@@ -75,9 +65,9 @@ async function issueAuthTokens(user: UserResponse): Promise<AuthResponse> {
     refreshToken,
     token: access.token,
   };
-}
+};
 
-function toUserResponse(user: {
+const toUserResponse = (user: {
   id: string;
   name: string;
   email: string;
@@ -86,20 +76,18 @@ function toUserResponse(user: {
   bannedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-}): UserResponse {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    isBanned: user.isBanned,
-    bannedAt: user.bannedAt,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-}
+}): UserResponse => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  isBanned: user.isBanned,
+  bannedAt: user.bannedAt,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
 
-export async function signup(input: SignupInput): Promise<AuthResponse> {
+const signup = async (input: SignupInput): Promise<AuthResponse> => {
   const now = new Date();
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
@@ -114,25 +102,24 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
 
     return issueAuthTokens(toUserResponse(user));
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
     }
 
     throw error;
   }
-}
+};
 
-export async function login(input: LoginInput): Promise<AuthResponse> {
-  const user = await authRepository.findUserRecordByEmail(input.email.toLowerCase());
+const login = async (input: LoginInput): Promise<AuthResponse> => {
+  const user = await authRepository.findUserRecordByEmail(
+    input.email.toLowerCase(),
+  );
 
   if (!user) {
     throw new AppError(401, 'Invalid email or password');
   }
 
-  const isValidPassword = await bcrypt.compare(
-    input.password,
-    user.password,
-  );
+  const isValidPassword = await bcrypt.compare(input.password, user.password);
 
   if (!isValidPassword) {
     throw new AppError(401, 'Invalid email or password');
@@ -143,25 +130,25 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   }
 
   return issueAuthTokens(toUserResponse(user));
-}
+};
 
-export async function refreshAccessToken(
+const refreshAccessToken = async (
   input: RefreshInput,
-): Promise<{ accessToken: string; token: string }> {
-  const tokenHash = hashToken(input.refreshToken);
-  const stored = await findValidRefreshToken(tokenHash);
+): Promise<{ accessToken: string; token: string }> => {
+  const tokenHash = tokenUtils.hashToken(input.refreshToken);
+  const stored = await tokenRepository.findValidRefreshToken(tokenHash);
 
   if (!stored) {
     throw new AppError(401, 'Invalid or expired refresh token');
   }
 
-  const user = await getUserById(stored.userId);
+  const user = await userService.getUserById(stored.userId);
 
   if (user.isBanned) {
     throw new AppError(403, 'Account has been banned');
   }
 
-  const access = signAccessToken({
+  const access = jwt.signAccessToken({
     userId: user.id,
     email: user.email,
     role: user.role as 'user' | 'admin',
@@ -171,25 +158,31 @@ export async function refreshAccessToken(
     accessToken: access.token,
     token: access.token,
   };
-}
+};
 
-export async function logout(
+const logout = async (
   auth: { userId: string; jti: string; expiresAt: Date },
   input: LogoutInput,
-): Promise<void> {
-  await blacklistAccessToken(auth.jti, auth.userId, auth.expiresAt);
+): Promise<void> => {
+  await tokenRepository.blacklistAccessToken(
+    auth.jti,
+    auth.userId,
+    auth.expiresAt,
+  );
 
   if (input.refreshToken) {
-    await revokeRefreshTokenByHash(hashToken(input.refreshToken));
+    await tokenRepository.revokeRefreshTokenByHash(
+      tokenUtils.hashToken(input.refreshToken),
+    );
   } else {
-    await revokeAllUserRefreshTokens(auth.userId);
+    await tokenRepository.revokeAllUserRefreshTokens(auth.userId);
   }
-}
+};
 
-export async function updateProfile(
+const updateProfile = async (
   userId: string,
   input: UpdateProfileInput,
-): Promise<UserResponse> {
+): Promise<UserResponse> => {
   const user = await userRepository.findUserAuthById(userId);
 
   if (!user) {
@@ -201,10 +194,7 @@ export async function updateProfile(
       throw new AppError(400, 'Current password is required');
     }
 
-    const valid = await bcrypt.compare(
-      input.currentPassword,
-      user.password,
-    );
+    const valid = await bcrypt.compare(input.currentPassword, user.password);
 
     if (!valid) {
       throw new AppError(401, 'Current password is incorrect');
@@ -212,7 +202,9 @@ export async function updateProfile(
   }
 
   if (input.email && input.email.toLowerCase() !== user.email) {
-    const existing = await authRepository.findUserRecordByEmail(input.email.toLowerCase());
+    const existing = await authRepository.findUserRecordByEmail(
+      input.email.toLowerCase(),
+    );
 
     if (existing && existing.id !== userId) {
       throw new AppError(409, 'Email is already registered');
@@ -236,16 +228,22 @@ export async function updateProfile(
 
     return toUserResponse(updated);
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof Error && postgresError.isUniqueViolation(error)) {
       throw new AppError(409, 'Email is already registered');
     }
 
     throw error;
   }
-}
+};
 
-export async function getAuthenticatedUser(
-  userId: string,
-): Promise<UserResponse> {
-  return getUserById(userId);
-}
+const getAuthenticatedUser = async (userId: string): Promise<UserResponse> =>
+  userService.getUserById(userId);
+
+export default {
+  signup,
+  login,
+  refreshAccessToken,
+  logout,
+  updateProfile,
+  getAuthenticatedUser,
+};

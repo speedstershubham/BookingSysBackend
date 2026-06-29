@@ -27,9 +27,9 @@ type SeatWithStatusRow = {
   locked_until: Date | null;
 };
 
-export async function findHallById(
+const findHallById = async (
   hallId: string,
-): Promise<{ id: string; name: string; capacity: number } | null> {
+): Promise<{ id: string; name: string; capacity: number } | null> => {
   const [hall] = await db<{ id: string; name: string; capacity: number }[]>`
     SELECT id, name, capacity
     FROM halls
@@ -38,11 +38,11 @@ export async function findHallById(
   `;
 
   return hall ?? null;
-}
+};
 
-export async function findHallSeats(
+const findHallSeats = async (
   hallId: string,
-): Promise<HallSeatsResponse | null> {
+): Promise<HallSeatsResponse | null> => {
   const hall = await findHallById(hallId);
 
   if (!hall) {
@@ -65,11 +65,11 @@ export async function findHallSeats(
       seatNumber: seat.seat_number,
     })),
   };
-}
+};
 
-async function findShowtimeMeta(
+const findShowtimeMeta = async (
   showtimeId: string,
-): Promise<ShowtimeMeta | null> {
+): Promise<ShowtimeMeta | null> => {
   const [showtime] = await db<ShowtimeMeta[]>`
     SELECT
       s.id AS showtime_id,
@@ -88,12 +88,12 @@ async function findShowtimeMeta(
   `;
 
   return showtime ?? null;
-}
+};
 
-function resolveSeatStatus(
+const resolveSeatStatus = (
   row: SeatWithStatusRow,
   userId?: string,
-): { status: SeatStatus; lockedByMe: boolean } {
+): { status: SeatStatus; lockedByMe: boolean } => {
   if (row.is_booked) {
     return { status: 'booked', lockedByMe: false };
   }
@@ -111,12 +111,12 @@ function resolveSeatStatus(
   }
 
   return { status: 'available', lockedByMe: false };
-}
+};
 
-export async function findShowtimeSeats(
+const findShowtimeSeats = async (
   showtimeId: string,
   userId?: string,
-): Promise<ShowtimeSeatsResponse | null> {
+): Promise<ShowtimeSeatsResponse | null> => {
   const showtime = await findShowtimeMeta(showtimeId);
 
   if (!showtime) {
@@ -172,13 +172,19 @@ export async function findShowtimeSeats(
       };
     }),
   };
-}
+};
 
-export async function findHallSeatsWithShowtimeStatus(
+const findHallSeatsWithShowtimeStatus = async (
   hallId: string,
   showtimeId: string,
   userId?: string,
-): Promise<(HallSeatsResponse & { showtimeId: string; seats: ShowtimeSeatsResponse['seats'] }) | null> {
+): Promise<
+  | (HallSeatsResponse & {
+      showtimeId: string;
+      seats: ShowtimeSeatsResponse['seats'];
+    })
+  | null
+> => {
   const hall = await findHallById(hallId);
 
   if (!hall) {
@@ -204,14 +210,14 @@ export async function findHallSeatsWithShowtimeStatus(
     showtimeId,
     seats: showtimeSeats.seats,
   };
-}
+};
 
-export async function lockSeats(
+const lockSeats = async (
   showtimeId: string,
   userId: string,
   seatIds: string[],
   lockedUntil: Date,
-): Promise<void> {
+): Promise<void> => {
   await db.begin(async (tx) => {
     const [showtime] = await tx<{ hall_id: string }[]>`
       SELECT hall_id
@@ -276,13 +282,13 @@ export async function lockSeats(
       `;
     }
   });
-}
+};
 
-export async function unlockSeats(
+const unlockSeats = async (
   showtimeId: string,
   userId: string,
   seatIds: string[],
-): Promise<number> {
+): Promise<number> => {
   const result = await db`
     DELETE FROM seat_locks
     WHERE showtime_id = ${showtimeId}
@@ -291,15 +297,15 @@ export async function unlockSeats(
   `;
 
   return result.count;
-}
+};
 
-export async function assertSeatsAvailableForBooking(
+const assertSeatsAvailableForBooking = async (
   tx: SQL,
   showtimeId: string,
   userId: string,
   seatIds: string[],
   excludeBookingId?: string,
-): Promise<void> {
+): Promise<void> => {
   const booked = excludeBookingId
     ? await tx<{ seat_id: string }[]>`
         SELECT mbs.seat_id
@@ -336,18 +342,29 @@ export async function assertSeatsAvailableForBooking(
   if (blocked.length > 0) {
     throw new Error('SEATS_LOCKED');
   }
-}
+};
 
-export async function releaseSeatLocksForBooking(
+const releaseSeatLocksForBooking = async (
   tx: SQL,
   showtimeId: string,
   userId: string,
   seatIds: string[],
-): Promise<void> {
+): Promise<void> => {
   await tx`
     DELETE FROM seat_locks
     WHERE showtime_id = ${showtimeId}
       AND user_id = ${userId}
       AND seat_id IN ${tx(seatIds)}
   `;
-}
+};
+
+export default {
+  findHallById,
+  findHallSeats,
+  findShowtimeSeats,
+  findHallSeatsWithShowtimeStatus,
+  lockSeats,
+  unlockSeats,
+  assertSeatsAvailableForBooking,
+  releaseSeatLocksForBooking,
+};

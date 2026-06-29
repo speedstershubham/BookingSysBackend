@@ -1,104 +1,100 @@
-import { withAdmin, withAuth } from '@/core/auth/auth.middleware';
-import { parseJsonBody } from '@/core/http/request';
-import { jsonResponse } from '@/core/http/response';
-import {
-  createMovieSchema,
-  createShowtimeSchema,
-  listMoviesQuerySchema,
-  movieIdSchema,
-  showtimeIdSchema,
-  updateMovieSchema,
-  updateShowtimeSchema,
-} from '@/modules/movies/validations/movie.validation';
-import {
-  createMovie,
-  createShowtime,
-  deleteMovie,
-  deleteShowtime,
-  getMovieById,
-  getMovies,
-  getShowtimeDetail,
-  getShowtimesByMovieId,
-  updateMovie,
-  updateShowtime,
-} from '@/modules/movies/services/movie.service';
+import authMiddleware from '@/core/auth/auth.middleware';
+import request from '@/core/http/request';
+import response from '@/core/http/response';
+import movieService from '@/modules/movies/services/movie.service';
+import movieValidation from '@/modules/movies/validations/movie.validation';
 
-export const listMoviesHandler = withAuth(async (req) => {
+const listMoviesHandler = authMiddleware.withAuth(async (req) => {
   const url = new URL(req.url);
-  const query = listMoviesQuerySchema.parse({
+  const query = movieValidation.listMoviesQuerySchema.parse({
     page: url.searchParams.get('page') ?? undefined,
     limit: url.searchParams.get('limit') ?? undefined,
   });
-  const result = await getMovies(query);
+  const result = await movieService.getMovies(query);
 
-  return jsonResponse(result);
+  return response.jsonResponse(result);
 });
 
-export const getMovieHandler = withAuth(async (_req, params) => {
-  const { id } = movieIdSchema.parse(params);
-  const movie = await getMovieById(id);
+const getMovieHandler = authMiddleware.withAuth(async (_req, params) => {
+  const { id } = movieValidation.movieIdSchema.parse(params);
+  const movie = await movieService.getMovieById(id);
 
-  return jsonResponse(movie);
+  return response.jsonResponse(movie);
 });
 
-export const listShowtimesByMovieHandler = withAuth(async (_req, params) => {
-  const { id } = movieIdSchema.parse(params);
-  const showtimes = await getShowtimesByMovieId(id);
+const listShowtimesByMovieHandler = authMiddleware.withAuth(
+  async (_req, params) => {
+    const { id } = movieValidation.movieIdSchema.parse(params);
+    const showtimes = await movieService.getShowtimesByMovieId(id);
 
-  return jsonResponse(showtimes);
+    return response.jsonResponse(showtimes);
+  },
+);
+
+const getShowtimeHandler = authMiddleware.withAuth(async (_req, params) => {
+  const { id } = movieValidation.showtimeIdSchema.parse(params);
+  const showtime = await movieService.getShowtimeDetail(id);
+
+  return response.jsonResponse(showtime);
 });
 
-export const getShowtimeHandler = withAuth(async (_req, params) => {
-  const { id } = showtimeIdSchema.parse(params);
-  const showtime = await getShowtimeDetail(id);
+const createMovieHandler = authMiddleware.withAdmin(async (req) => {
+  const body = await request.parseJsonBody(req);
+  const input = movieValidation.createMovieSchema.parse(body);
+  const movie = await movieService.createMovie(input);
 
-  return jsonResponse(showtime);
+  return response.jsonResponse(movie, 201);
 });
 
-export const createMovieHandler = withAdmin(async (req) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = createMovieSchema.parse(body);
-  const movie = await createMovie(input);
+const updateMovieHandler = authMiddleware.withAdmin(async (req, params) => {
+  const { id } = movieValidation.movieIdSchema.parse(params);
+  const body = await request.parseJsonBody(req);
+  const input = movieValidation.updateMovieSchema.parse(body);
+  const movie = await movieService.updateMovie(id, input);
 
-  return jsonResponse(movie, 201);
+  return response.jsonResponse(movie);
 });
 
-export const updateMovieHandler = withAdmin(async (req, params) => {
-  const { id } = movieIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateMovieSchema.parse(body);
-  const movie = await updateMovie(id, input);
+const deleteMovieHandler = authMiddleware.withAdmin(async (_req, params) => {
+  const { id } = movieValidation.movieIdSchema.parse(params);
+  await movieService.deleteMovie(id);
 
-  return jsonResponse(movie);
+  return response.jsonResponse({ message: 'Movie deleted' });
 });
 
-export const deleteMovieHandler = withAdmin(async (_req, params) => {
-  const { id } = movieIdSchema.parse(params);
-  await deleteMovie(id);
+const createShowtimeHandler = authMiddleware.withAdmin(async (req) => {
+  const body = await request.parseJsonBody(req);
+  const input = movieValidation.createShowtimeSchema.parse(body);
+  const showtime = await movieService.createShowtime(input);
 
-  return jsonResponse({ message: 'Movie deleted' });
+  return response.jsonResponse(showtime, 201);
 });
 
-export const createShowtimeHandler = withAdmin(async (req) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = createShowtimeSchema.parse(body);
-  const showtime = await createShowtime(input);
+const updateShowtimeHandler = authMiddleware.withAdmin(async (req, params) => {
+  const { id } = movieValidation.showtimeIdSchema.parse(params);
+  const body = await request.parseJsonBody(req);
+  const input = movieValidation.updateShowtimeSchema.parse(body);
+  const showtime = await movieService.updateShowtime(id, input);
 
-  return jsonResponse(showtime, 201);
+  return response.jsonResponse(showtime);
 });
 
-export const updateShowtimeHandler = withAdmin(async (req, params) => {
-  const { id } = showtimeIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateShowtimeSchema.parse(body);
-  const showtime = await updateShowtime(id, input);
+const deleteShowtimeHandler = authMiddleware.withAdmin(async (_req, params) => {
+  const { id } = movieValidation.showtimeIdSchema.parse(params);
+  await movieService.deleteShowtime(id);
 
-  return jsonResponse(showtime);
+  return response.jsonResponse({ message: 'Showtime deleted' });
 });
 
-export const deleteShowtimeHandler = withAdmin(async (_req, params) => {
-  const { id } = showtimeIdSchema.parse(params);
-  await deleteShowtime(id);
-
-  return jsonResponse({ message: 'Showtime deleted' });
-});
+export default {
+  listMoviesHandler,
+  getMovieHandler,
+  listShowtimesByMovieHandler,
+  getShowtimeHandler,
+  createMovieHandler,
+  updateMovieHandler,
+  deleteMovieHandler,
+  createShowtimeHandler,
+  updateShowtimeHandler,
+  deleteShowtimeHandler,
+};

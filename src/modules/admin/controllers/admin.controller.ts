@@ -1,185 +1,173 @@
-import { withAdmin } from '@/core/auth/auth.middleware';
-import { parseJsonBody } from '@/core/http/request';
-import { jsonResponse } from '@/core/http/response';
-import {
-  bookingIdSchema,
-  createHallSchema,
-  createTheatreSchema,
-  bookingsReportQuerySchema,
-  hallIdSchema,
-  listBookingsQuerySchema,
-  listHallsQuerySchema,
-  occupancyReportQuerySchema,
-  paginationQuerySchema,
-  regenerateSeatsSchema,
-  revenueReportQuerySchema,
-  theatreIdSchema,
-  updateHallSchema,
-  updateTheatreSchema,
-  updateUserBanSchema,
-  updateUserRoleSchema,
-  userIdSchema,
-} from '@/modules/admin/validations/admin.validation';
-import {
-  getAdminBookingById,
-  getAllBookings,
-  getBookingsReportData,
-  getOccupancyReportData,
-  getRevenueReportData,
-} from '@/modules/admin/services/admin-booking.service';
-import {
-  createHall,
-  deleteHall,
-  getHallById,
-  getHalls,
-  regenerateSeats,
-  updateHall,
-} from '@/modules/admin/services/hall-admin.service';
-import {
-  getAdminUserById,
-  getAdminUsers,
-  updateUserBan,
-  updateUserRole,
-} from '@/modules/admin/services/admin-user.service';
-import {
-  createTheatre,
-  deleteTheatre,
-  getTheatreById,
-  getTheatres,
-  updateTheatre,
-} from '@/modules/admin/services/theatre.service';
+import authMiddleware from '@/core/auth/auth.middleware';
+import httpRequest from '@/core/http/request';
+import httpResponse from '@/core/http/response';
+import adminValidation from '@/modules/admin/validations/admin.validation';
+import adminBookingService from '@/modules/admin/services/admin-booking.service';
+import hallAdminService from '@/modules/admin/services/hall-admin.service';
+import adminUserService from '@/modules/admin/services/admin-user.service';
+import theatreService from '@/modules/admin/services/theatre.service';
 
-function parseQuery(req: Request) {
-  return Object.fromEntries(new URL(req.url).searchParams);
-}
+const { withAdmin } = authMiddleware;
+const { parseJsonBody } = httpRequest;
+const { jsonResponse } = httpResponse;
 
-export const listTheatresHandler = withAdmin(async () => {
-  const theatres = await getTheatres();
+const parseQuery = (req: Request) =>
+  Object.fromEntries(new URL(req.url).searchParams);
+
+const listTheatresHandler = withAdmin(async () => {
+  const theatres = await theatreService.getTheatres();
   return jsonResponse(theatres);
 });
 
-export const getTheatreHandler = withAdmin(async (_req, params) => {
-  const { id } = theatreIdSchema.parse(params);
-  const theatre = await getTheatreById(id);
+const getTheatreHandler = withAdmin(async (_req, params) => {
+  const { id } = adminValidation.theatreIdSchema.parse(params);
+  const theatre = await theatreService.getTheatreById(id);
   return jsonResponse(theatre);
 });
 
-export const createTheatreHandler = withAdmin(async (req) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = createTheatreSchema.parse(body);
-  const theatre = await createTheatre(input);
+const createTheatreHandler = withAdmin(async (req) => {
+  const body = await parseJsonBody(req);
+  const input = adminValidation.createTheatreSchema.parse(body);
+  const theatre = await theatreService.createTheatre(input);
   return jsonResponse(theatre, 201);
 });
 
-export const updateTheatreHandler = withAdmin(async (req, params) => {
-  const { id } = theatreIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateTheatreSchema.parse(body);
-  const theatre = await updateTheatre(id, input);
+const updateTheatreHandler = withAdmin(async (req, params) => {
+  const { id } = adminValidation.theatreIdSchema.parse(params);
+  const body = await parseJsonBody(req);
+  const input = adminValidation.updateTheatreSchema.parse(body);
+  const theatre = await theatreService.updateTheatre(id, input);
   return jsonResponse(theatre);
 });
 
-export const deleteTheatreHandler = withAdmin(async (_req, params) => {
-  const { id } = theatreIdSchema.parse(params);
-  await deleteTheatre(id);
+const deleteTheatreHandler = withAdmin(async (_req, params) => {
+  const { id } = adminValidation.theatreIdSchema.parse(params);
+  await theatreService.deleteTheatre(id);
   return jsonResponse({ message: 'Theatre deleted' });
 });
 
-export const listHallsHandler = withAdmin(async (req) => {
-  const query = listHallsQuerySchema.parse(parseQuery(req));
-  const halls = await getHalls(query);
+const listHallsHandler = withAdmin(async (req) => {
+  const query = adminValidation.listHallsQuerySchema.parse(parseQuery(req));
+  const halls = await hallAdminService.getHalls(query);
   return jsonResponse(halls);
 });
 
-export const getHallHandler = withAdmin(async (_req, params) => {
-  const { id } = hallIdSchema.parse(params);
-  const hall = await getHallById(id);
+const getHallHandler = withAdmin(async (_req, params) => {
+  const { id } = adminValidation.hallIdSchema.parse(params);
+  const hall = await hallAdminService.getHallById(id);
   return jsonResponse(hall);
 });
 
-export const createHallHandler = withAdmin(async (req) => {
-  const body = await parseJsonBody<unknown>(req);
-  const input = createHallSchema.parse(body);
-  const hall = await createHall(input);
+const createHallHandler = withAdmin(async (req) => {
+  const body = await parseJsonBody(req);
+  const input = adminValidation.createHallSchema.parse(body);
+  const hall = await hallAdminService.createHall(input);
   return jsonResponse(hall, 201);
 });
 
-export const updateHallHandler = withAdmin(async (req, params) => {
-  const { id } = hallIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateHallSchema.parse(body);
-  const hall = await updateHall(id, input);
+const updateHallHandler = withAdmin(async (req, params) => {
+  const { id } = adminValidation.hallIdSchema.parse(params);
+  const body = await parseJsonBody(req);
+  const input = adminValidation.updateHallSchema.parse(body);
+  const hall = await hallAdminService.updateHall(id, input);
   return jsonResponse(hall);
 });
 
-export const regenerateSeatsHandler = withAdmin(async (req, params) => {
-  const { id } = hallIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = regenerateSeatsSchema.parse(body);
-  const hall = await regenerateSeats(id, input.capacity);
+const regenerateSeatsHandler = withAdmin(async (req, params) => {
+  const { id } = adminValidation.hallIdSchema.parse(params);
+  const body = await parseJsonBody(req);
+  const input = adminValidation.regenerateSeatsSchema.parse(body);
+  const hall = await hallAdminService.regenerateSeats(id, input.capacity);
   return jsonResponse(hall);
 });
 
-export const deleteHallHandler = withAdmin(async (_req, params) => {
-  const { id } = hallIdSchema.parse(params);
-  await deleteHall(id);
+const deleteHallHandler = withAdmin(async (_req, params) => {
+  const { id } = adminValidation.hallIdSchema.parse(params);
+  await hallAdminService.deleteHall(id);
   return jsonResponse({ message: 'Hall deleted' });
 });
 
-export const listBookingsHandler = withAdmin(async (req) => {
-  const query = listBookingsQuerySchema.parse(parseQuery(req));
-  const bookings = await getAllBookings(query);
+const listBookingsHandler = withAdmin(async (req) => {
+  const query = adminValidation.listBookingsQuerySchema.parse(parseQuery(req));
+  const bookings = await adminBookingService.getAllBookings(query);
   return jsonResponse(bookings);
 });
 
-export const getBookingHandler = withAdmin(async (_req, params) => {
-  const { id } = bookingIdSchema.parse(params);
-  const booking = await getAdminBookingById(id);
+const getBookingHandler = withAdmin(async (_req, params) => {
+  const { id } = adminValidation.bookingIdSchema.parse(params);
+  const booking = await adminBookingService.getAdminBookingById(id);
   return jsonResponse(booking);
 });
 
-export const revenueReportHandler = withAdmin(async (req) => {
-  const query = revenueReportQuerySchema.parse(parseQuery(req));
-  const report = await getRevenueReportData(query);
+const revenueReportHandler = withAdmin(async (req) => {
+  const query = adminValidation.revenueReportQuerySchema.parse(parseQuery(req));
+  const report = await adminBookingService.getRevenueReportData(query);
   return jsonResponse(report);
 });
 
-export const occupancyReportHandler = withAdmin(async (req) => {
-  const query = occupancyReportQuerySchema.parse(parseQuery(req));
-  const report = await getOccupancyReportData(query);
+const occupancyReportHandler = withAdmin(async (req) => {
+  const query = adminValidation.occupancyReportQuerySchema.parse(
+    parseQuery(req),
+  );
+  const report = await adminBookingService.getOccupancyReportData(query);
   return jsonResponse(report);
 });
 
-export const bookingsReportHandler = withAdmin(async (req) => {
-  const query = bookingsReportQuerySchema.parse(parseQuery(req));
-  const report = await getBookingsReportData(query);
+const bookingsReportHandler = withAdmin(async (req) => {
+  const query = adminValidation.bookingsReportQuerySchema.parse(
+    parseQuery(req),
+  );
+  const report = await adminBookingService.getBookingsReportData(query);
   return jsonResponse(report);
 });
 
-export const listAdminUsersHandler = withAdmin(async (req) => {
-  const query = paginationQuerySchema.parse(parseQuery(req));
-  const users = await getAdminUsers(query);
+const listAdminUsersHandler = withAdmin(async (req) => {
+  const query = adminValidation.paginationQuerySchema.parse(parseQuery(req));
+  const users = await adminUserService.getAdminUsers(query);
   return jsonResponse(users);
 });
 
-export const getAdminUserHandler = withAdmin(async (_req, params) => {
-  const { id } = userIdSchema.parse(params);
-  const user = await getAdminUserById(id);
+const getAdminUserHandler = withAdmin(async (_req, params) => {
+  const { id } = adminValidation.userIdSchema.parse(params);
+  const user = await adminUserService.getAdminUserById(id);
   return jsonResponse(user);
 });
 
-export const updateUserRoleHandler = withAdmin(async (req, params, auth) => {
-  const { id } = userIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateUserRoleSchema.parse(body);
-  const user = await updateUserRole(id, input, auth.userId);
+const updateUserRoleHandler = withAdmin(async (req, params, auth) => {
+  const { id } = adminValidation.userIdSchema.parse(params);
+  const body = await parseJsonBody(req);
+  const input = adminValidation.updateUserRoleSchema.parse(body);
+  const user = await adminUserService.updateUserRole(id, input, auth.userId);
   return jsonResponse(user);
 });
 
-export const updateUserBanHandler = withAdmin(async (req, params, auth) => {
-  const { id } = userIdSchema.parse(params);
-  const body = await parseJsonBody<unknown>(req);
-  const input = updateUserBanSchema.parse(body);
-  const user = await updateUserBan(id, input, auth.userId);
+const updateUserBanHandler = withAdmin(async (req, params, auth) => {
+  const { id } = adminValidation.userIdSchema.parse(params);
+  const body = await parseJsonBody(req);
+  const input = adminValidation.updateUserBanSchema.parse(body);
+  const user = await adminUserService.updateUserBan(id, input, auth.userId);
   return jsonResponse(user);
 });
+
+export default {
+  listTheatresHandler,
+  getTheatreHandler,
+  createTheatreHandler,
+  updateTheatreHandler,
+  deleteTheatreHandler,
+  listHallsHandler,
+  getHallHandler,
+  createHallHandler,
+  updateHallHandler,
+  regenerateSeatsHandler,
+  deleteHallHandler,
+  listBookingsHandler,
+  getBookingHandler,
+  revenueReportHandler,
+  occupancyReportHandler,
+  bookingsReportHandler,
+  listAdminUsersHandler,
+  getAdminUserHandler,
+  updateUserRoleHandler,
+  updateUserBanHandler,
+};

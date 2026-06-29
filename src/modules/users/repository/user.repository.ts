@@ -1,8 +1,7 @@
-import bcrypt from 'bcrypt';
 import database from '@/database/database';
 import Tables from '@/database/tables';
 import userColumns from '@/modules/users/repository/user.columns';
-import type { PaginationParams } from '@/core/types/pagination';
+import type { PaginationParams } from '@/core/types/pagination.types';
 import type {
   InsertUserPayload,
   UserAuthRecord,
@@ -97,9 +96,7 @@ const findUsers = async (
   };
 };
 
-const findUserAuthById = async (
-  id: string,
-): Promise<UserAuthRecord | null> => {
+const findUserAuthById = async (id: string): Promise<UserAuthRecord | null> => {
   const user = await database.findOne<UserAuthRow>({
     table: Tables.USERS,
     columns: userColumns.USER_AUTH_COLUMNS,

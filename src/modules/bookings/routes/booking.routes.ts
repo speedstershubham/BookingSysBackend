@@ -1,36 +1,30 @@
-import type { Route } from '@/core/router/router';
-import {
-  cancelBookingHandler,
-  createBookingHandler,
-  getBookingByIdHandler,
-  getMyBookingsHandler,
-  updateBookingHandler,
-} from '@/modules/bookings/controllers/booking.controller';
+import type { Route } from '@/core/router/router.types';
+import bookingController from '@/modules/bookings/controllers/booking.controller';
 
-export const bookingRoutes: Route[] = [
+export default [
   {
     method: 'POST',
     path: '/api/bookings',
-    handler: createBookingHandler,
+    handler: bookingController.createBookingHandler,
   },
   {
     method: 'GET',
     path: '/api/bookings/me',
-    handler: getMyBookingsHandler,
+    handler: bookingController.getMyBookingsHandler,
   },
   {
     method: 'GET',
     path: '/api/bookings/:id',
-    handler: getBookingByIdHandler,
+    handler: bookingController.getBookingByIdHandler,
   },
   {
     method: 'PATCH',
     path: '/api/bookings/:id',
-    handler: updateBookingHandler,
+    handler: bookingController.updateBookingHandler,
   },
   {
     method: 'DELETE',
     path: '/api/bookings/:id',
-    handler: cancelBookingHandler,
+    handler: bookingController.cancelBookingHandler,
   },
-];
+] satisfies Route[];

@@ -1,25 +1,17 @@
 import jwt, { type SignOptions } from 'jsonwebtoken';
-import { env } from '@/config/env';
-import { generateJti } from '@/core/auth/token.utils';
+import env from '@/config/env';
+import tokenUtils from '@/core/auth/token.utils';
+import type { JwtPayload, VerifiedToken } from '@/core/auth/jwt.types';
 
-export type UserRole = 'user' | 'admin';
+const { generateJti } = tokenUtils;
 
-export type JwtPayload = {
-  userId: string;
-  email: string;
-  role: UserRole;
-  jti: string;
-};
-
-export type VerifiedToken = JwtPayload & {
-  expiresAt: Date;
-};
-
-export function signAccessToken(payload: Omit<JwtPayload, 'jti'>): {
+const signAccessToken = (
+  payload: Omit<JwtPayload, 'jti'>,
+): {
   token: string;
   jti: string;
   expiresAt: Date;
-} {
+} => {
   const jti = generateJti();
   const expiresIn = env.JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'];
   const token = jwt.sign({ ...payload, jti }, env.JWT_SECRET, { expiresIn });
@@ -30,9 +22,9 @@ export function signAccessToken(payload: Omit<JwtPayload, 'jti'>): {
     jti,
     expiresAt: new Date(decoded.exp * 1000),
   };
-}
+};
 
-export function verifyToken(token: string): VerifiedToken {
+const verifyToken = (token: string): VerifiedToken => {
   const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload & {
     exp: number;
   };
@@ -44,9 +36,10 @@ export function verifyToken(token: string): VerifiedToken {
     jti: payload.jti,
     expiresAt: new Date(payload.exp * 1000),
   };
-}
+};
 
 /** @deprecated Use signAccessToken */
-export function signToken(payload: Omit<JwtPayload, 'jti'>): string {
-  return signAccessToken(payload).token;
-}
+const signToken = (payload: Omit<JwtPayload, 'jti'>): string =>
+  signAccessToken(payload).token;
+
+export default { signAccessToken, verifyToken, signToken };

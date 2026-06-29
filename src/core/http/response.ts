@@ -1,16 +1,11 @@
-import { AppError } from '@/core/errors/app-error';
+import AppError from '@/core/errors/app-error';
+import type { SuccessPayload } from '@/core/http/http.types';
 import { ZodError } from 'zod';
 
-type SuccessPayload = Record<string, unknown> | unknown[];
+const jsonResponse = (data: SuccessPayload, status = 200): Response =>
+  Response.json({ success: true, data }, { status });
 
-export function jsonResponse(
-  data: SuccessPayload,
-  status = 200,
-): Response {
-  return Response.json({ success: true, data }, { status });
-}
-
-export function errorResponse(error: unknown): Response {
+const errorResponse = (error: Error): Response => {
   if (error instanceof AppError) {
     return Response.json(
       { success: false, message: error.message },
@@ -36,4 +31,6 @@ export function errorResponse(error: unknown): Response {
     { success: false, message: 'Internal server error' },
     { status: 500 },
   );
-}
+};
+
+export default { jsonResponse, errorResponse };

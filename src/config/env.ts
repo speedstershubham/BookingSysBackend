@@ -15,4 +15,6 @@ const envSchema = z.object({
   SEAT_LOCK_TTL_MINUTES: z.coerce.number().int().positive().default(10),
 });
 
-export const env = envSchema.parse(process.env);
+const env = envSchema.parse(process.env);
+
+export default env;

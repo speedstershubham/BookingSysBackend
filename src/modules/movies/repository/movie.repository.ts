@@ -1,5 +1,5 @@
 import { db } from '@/database/postgres';
-import type { PaginationParams } from '@/core/types/pagination';
+import type { PaginationParams } from '@/core/types/pagination.types';
 import type {
   CreateMovieInput,
   HallRecord,
@@ -12,18 +12,16 @@ import type {
   UpdateMovieInput,
 } from '@/modules/movies/types/movie.types';
 
-function mapMovieRow(row: MovieRow): MovieRecord {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    durationMinutes: row.duration_minutes,
-    genre: row.genre,
-    rating: row.rating,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+const mapMovieRow = (row: MovieRow): MovieRecord => ({
+  id: row.id,
+  title: row.title,
+  description: row.description,
+  durationMinutes: row.duration_minutes,
+  genre: row.genre,
+  rating: row.rating,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
 type ShowtimeJoinRow = {
   showtime_id: string;
@@ -34,20 +32,18 @@ type ShowtimeJoinRow = {
   end_time: Date;
 };
 
-function mapShowtimeRow(row: ShowtimeJoinRow): HallSummary {
-  return {
-    showtimeId: row.showtime_id,
-    hallId: row.hall_id,
-    hallName: row.hall_name,
-    capacity: row.capacity,
-    startTime: row.start_time,
-    endTime: row.end_time,
-  };
-}
+const mapShowtimeRow = (row: ShowtimeJoinRow): HallSummary => ({
+  showtimeId: row.showtime_id,
+  hallId: row.hall_id,
+  hallName: row.hall_name,
+  capacity: row.capacity,
+  startTime: row.start_time,
+  endTime: row.end_time,
+});
 
-export async function findMovies(
+const findMovies = async (
   params: PaginationParams,
-): Promise<{ movies: MovieRecord[]; total: number }> {
+): Promise<{ movies: MovieRecord[]; total: number }> => {
   const offset = (params.page - 1) * params.limit;
 
   const [countRow] = await db<{ count: number }[]>`
@@ -67,11 +63,11 @@ export async function findMovies(
     movies: movies.map(mapMovieRow),
     total,
   };
-}
+};
 
-export async function findMovieById(
+const findMovieById = async (
   id: string,
-): Promise<MovieWithShowtimes | null> {
+): Promise<MovieWithShowtimes | null> => {
   const [movie] = await db<MovieRow[]>`
     SELECT id, title, description, duration_minutes, genre, rating, created_at, updated_at
     FROM movies
@@ -89,11 +85,11 @@ export async function findMovieById(
     ...mapMovieRow(movie),
     showtimes,
   };
-}
+};
 
-export async function findShowtimesByMovieId(
+const findShowtimesByMovieId = async (
   movieId: string,
-): Promise<HallSummary[]> {
+): Promise<HallSummary[]> => {
   const showtimes = await db<ShowtimeJoinRow[]>`
     SELECT
       s.id AS showtime_id,
@@ -109,11 +105,9 @@ export async function findShowtimesByMovieId(
   `;
 
   return showtimes.map(mapShowtimeRow);
-}
+};
 
-export async function insertMovie(
-  input: CreateMovieInput,
-): Promise<MovieRecord> {
+const insertMovie = async (input: CreateMovieInput): Promise<MovieRecord> => {
   const now = new Date();
   const [movie] = await db<MovieRow[]>`
     INSERT INTO movies (title, description, duration_minutes, genre, rating, created_at, updated_at)
@@ -134,12 +128,12 @@ export async function insertMovie(
   }
 
   return mapMovieRow(movie);
-}
+};
 
-export async function updateMovieById(
+const updateMovieById = async (
   id: string,
   input: UpdateMovieInput,
-): Promise<MovieRecord | null> {
+): Promise<MovieRecord | null> => {
   const [existing] = await db<MovieRow[]>`
     SELECT id, title, description, duration_minutes, genre, rating, created_at, updated_at
     FROM movies
@@ -165,31 +159,31 @@ export async function updateMovieById(
   `;
 
   return movie ? mapMovieRow(movie) : null;
-}
+};
 
-export async function deleteMovieById(id: string): Promise<boolean> {
+const deleteMovieById = async (id: string): Promise<boolean> => {
   const result = await db`
     DELETE FROM movies WHERE id = ${id}
   `;
 
   return result.count > 0;
-}
+};
 
-export async function findHallById(id: string): Promise<HallRecord | null> {
+const findHallById = async (id: string): Promise<HallRecord | null> => {
   const [hall] = await db<{ id: string; name: string; capacity: number }[]>`
     SELECT id, name, capacity FROM halls WHERE id = ${id} LIMIT 1
   `;
 
   return hall ?? null;
-}
+};
 
-export async function insertShowtime(
+const insertShowtime = async (
   movieId: string,
   hallId: string,
   startTime: Date,
   endTime: Date,
   ticketPrice = 500,
-): Promise<ShowtimeRecord> {
+): Promise<ShowtimeRecord> => {
   const [showtime] = await db<
     {
       id: string;
@@ -217,11 +211,9 @@ export async function insertShowtime(
     endTime: showtime.end_time,
     ticketPrice: Number(showtime.ticket_price),
   };
-}
+};
 
-export async function findShowtimeById(
-  id: string,
-): Promise<ShowtimeRecord | null> {
+const findShowtimeById = async (id: string): Promise<ShowtimeRecord | null> => {
   const [showtime] = await db<
     {
       id: string;
@@ -250,11 +242,11 @@ export async function findShowtimeById(
     endTime: showtime.end_time,
     ticketPrice: Number(showtime.ticket_price),
   };
-}
+};
 
-export async function findShowtimeDetailById(
+const findShowtimeDetailById = async (
   id: string,
-): Promise<ShowtimeDetailResponse | null> {
+): Promise<ShowtimeDetailResponse | null> => {
   const [showtime] = await db<
     {
       id: string;
@@ -300,11 +292,9 @@ export async function findShowtimeDetailById(
     endTime: showtime.end_time,
     ticketPrice: Number(showtime.ticket_price),
   };
-}
+};
 
-export async function countShowtimeBookings(
-  showtimeId: string,
-): Promise<number> {
+const countShowtimeBookings = async (showtimeId: string): Promise<number> => {
   const [row] = await db<{ count: number }[]>`
     SELECT COUNT(*)::int AS count
     FROM movie_bookings
@@ -313,9 +303,9 @@ export async function countShowtimeBookings(
   `;
 
   return row!.count;
-}
+};
 
-export async function updateShowtimeById(
+const updateShowtimeById = async (
   id: string,
   input: {
     hallId: string;
@@ -323,7 +313,7 @@ export async function updateShowtimeById(
     endTime: Date;
     ticketPrice: number;
   },
-): Promise<ShowtimeRecord | null> {
+): Promise<ShowtimeRecord | null> => {
   const [showtime] = await db<
     {
       id: string;
@@ -356,22 +346,37 @@ export async function updateShowtimeById(
     endTime: showtime.end_time,
     ticketPrice: Number(showtime.ticket_price),
   };
-}
+};
 
-export async function deleteShowtimeById(id: string): Promise<boolean> {
+const deleteShowtimeById = async (id: string): Promise<boolean> => {
   const result = await db`
     DELETE FROM showtimes WHERE id = ${id}
   `;
 
   return result.count > 0;
-}
+};
 
-export async function findMovieDurationMinutes(
-  id: string,
-): Promise<number | null> {
+const findMovieDurationMinutes = async (id: string): Promise<number | null> => {
   const [row] = await db<{ duration_minutes: number }[]>`
     SELECT duration_minutes FROM movies WHERE id = ${id} LIMIT 1
   `;
 
   return row?.duration_minutes ?? null;
-}
+};
+
+export default {
+  findMovies,
+  findMovieById,
+  findShowtimesByMovieId,
+  insertMovie,
+  updateMovieById,
+  deleteMovieById,
+  findHallById,
+  insertShowtime,
+  findShowtimeById,
+  findShowtimeDetailById,
+  countShowtimeBookings,
+  updateShowtimeById,
+  deleteShowtimeById,
+  findMovieDurationMinutes,
+};

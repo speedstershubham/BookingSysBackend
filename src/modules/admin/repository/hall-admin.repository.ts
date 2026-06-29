@@ -1,12 +1,13 @@
 import type { SQL } from 'bun';
-
-import { db } from '@/database/postgres';
+import getDB from '@/database/postgres';
 import type {
   CreateHallInput,
   HallAdminRecord,
   ListHallsFilters,
   UpdateHallInput,
 } from '@/modules/admin/types/admin.types';
+
+const db = await getDB();
 
 type HallRow = {
   id: string;
@@ -19,22 +20,20 @@ type HallRow = {
   updated_at: Date;
 };
 
-function mapHall(row: HallRow): HallAdminRecord {
-  return {
-    id: row.id,
-    theatreId: row.theatre_id,
-    theatreName: row.theatre_name,
-    name: row.name,
-    capacity: row.capacity,
-    seatCount: row.seat_count,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+const mapHall = (row: HallRow): HallAdminRecord => ({
+  id: row.id,
+  theatreId: row.theatre_id,
+  theatreName: row.theatre_name,
+  name: row.name,
+  capacity: row.capacity,
+  seatCount: row.seat_count,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
-export async function findHalls(
+const findHalls = async (
   filters: ListHallsFilters,
-): Promise<{ halls: HallAdminRecord[]; total: number }> {
+): Promise<{ halls: HallAdminRecord[]; total: number }> => {
   const offset = (filters.page - 1) * filters.limit;
 
   const [countRow] = filters.theatreId
@@ -93,11 +92,11 @@ export async function findHalls(
     halls: rows.map(mapHall),
     total,
   };
-}
+};
 
-export async function findHallAdminById(
+const findHallAdminById = async (
   id: string,
-): Promise<HallAdminRecord | null> {
+): Promise<HallAdminRecord | null> => {
   const [row] = await db<HallRow[]>`
     SELECT
       h.id,
@@ -117,22 +116,22 @@ export async function findHallAdminById(
   `;
 
   return row ? mapHall(row) : null;
-}
+};
 
-async function generateSeatsForHall(
+const generateSeatsForHall = async (
   tx: SQL,
   hallId: string,
   capacity: number,
-): Promise<void> {
+): Promise<void> => {
   await tx`
     INSERT INTO seats (hall_id, seat_number)
     SELECT ${hallId}, gs.seat_number
     FROM generate_series(1, ${capacity}) AS gs(seat_number)
     ON CONFLICT (hall_id, seat_number) DO NOTHING
   `;
-}
+};
 
-export async function insertHall(input: CreateHallInput): Promise<HallAdminRecord> {
+const insertHall = async (input: CreateHallInput): Promise<HallAdminRecord> => {
   const hallId = await db.begin(async (tx) => {
     const now = new Date();
     const [hall] = await tx<{ id: string }[]>`
@@ -157,12 +156,12 @@ export async function insertHall(input: CreateHallInput): Promise<HallAdminRecor
   }
 
   return created;
-}
+};
 
-export async function updateHallById(
+const updateHallById = async (
   id: string,
   input: UpdateHallInput,
-): Promise<HallAdminRecord> {
+): Promise<HallAdminRecord> => {
   await db.begin(async (tx) => {
     const [existing] = await tx<
       { id: string; name: string; capacity: number }[]
@@ -231,12 +230,12 @@ export async function updateHallById(
   }
 
   return updated;
-}
+};
 
-export async function regenerateHallSeats(
+const regenerateHallSeats = async (
   hallId: string,
   capacity?: number,
-): Promise<HallAdminRecord> {
+): Promise<HallAdminRecord> => {
   await db.begin(async (tx) => {
     const [hall] = await tx<{ capacity: number }[]>`
       SELECT capacity
@@ -291,11 +290,9 @@ export async function regenerateHallSeats(
   }
 
   return updated;
-}
+};
 
-export async function countHallShowtimeBookings(
-  hallId: string,
-): Promise<number> {
+const countHallShowtimeBookings = async (hallId: string): Promise<number> => {
   const [row] = await db<{ count: number }[]>`
     SELECT COUNT(DISTINCT mb.id)::int AS count
     FROM movie_bookings mb
@@ -304,9 +301,9 @@ export async function countHallShowtimeBookings(
   `;
 
   return row!.count;
-}
+};
 
-export async function countHallShowtimes(hallId: string): Promise<number> {
+const countHallShowtimes = async (hallId: string): Promise<number> => {
   const [row] = await db<{ count: number }[]>`
     SELECT COUNT(*)::int AS count
     FROM showtimes
@@ -314,13 +311,24 @@ export async function countHallShowtimes(hallId: string): Promise<number> {
   `;
 
   return row!.count;
-}
+};
 
-export async function deleteHallById(id: string): Promise<boolean> {
+const deleteHallById = async (id: string): Promise<boolean> => {
   const result = await db`
     DELETE FROM halls
     WHERE id = ${id}
   `;
 
   return result.count > 0;
-}
+};
+
+export default {
+  findHalls,
+  findHallAdminById,
+  insertHall,
+  updateHallById,
+  regenerateHallSeats,
+  countHallShowtimeBookings,
+  countHallShowtimes,
+  deleteHallById,
+};

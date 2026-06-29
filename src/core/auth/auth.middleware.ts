@@ -1,13 +1,17 @@
-import { verifyToken } from '@/core/auth/jwt';
-import { isAccessTokenBlacklisted } from '@/modules/auth/repository/token.repository';
-import { isUserBanned } from '@/modules/admin/repository/admin-user.repository';
-import { AppError } from '@/core/errors/app-error';
-import type { RouteHandler } from '@/core/router/router';
-import type { JwtPayload } from '@/core/auth/jwt';
+import jwt from '@/core/auth/jwt';
+import type {
+  AdminHandler,
+  AuthContext,
+  AuthenticatedHandler,
+} from '@/core/auth/auth.middleware.types';
+import type { RouteHandler } from '@/core/router/router.types';
+import AppError from '@/core/errors/app-error';
+import tokenRepository from '@/modules/auth/repository/token.repository';
+import adminUserRepository from '@/modules/admin/repository/admin-user.repository';
 
-export type AuthContext = JwtPayload & { expiresAt: Date };
+const { verifyToken } = jwt;
 
-export function authenticate(req: Request): AuthContext {
+const authenticate = (req: Request): AuthContext => {
   const authHeader = req.headers.get('Authorization');
 
   if (!authHeader?.startsWith('Bearer ')) {
@@ -21,43 +25,32 @@ export function authenticate(req: Request): AuthContext {
   } catch {
     throw new AppError(401, 'Invalid or expired token');
   }
-}
+};
 
-async function assertAuthenticated(req: Request): Promise<AuthContext> {
+const assertAuthenticated = async (req: Request): Promise<AuthContext> => {
   const auth = authenticate(req);
 
-  if (await isAccessTokenBlacklisted(auth.jti)) {
+  if (await tokenRepository.isAccessTokenBlacklisted(auth.jti)) {
     throw new AppError(401, 'Token has been revoked');
   }
 
-  if (await isUserBanned(auth.userId)) {
+  if (await adminUserRepository.isUserBanned(auth.userId)) {
     throw new AppError(403, 'Account has been banned');
   }
 
   return auth;
-}
+};
 
-type AuthenticatedHandler = (
-  req: Request,
-  params: Record<string, string>,
-  auth: AuthContext,
-) => Promise<Response>;
-
-export function withAuth(handler: AuthenticatedHandler): RouteHandler {
-  return async (req, params) => {
+const withAuth =
+  (handler: AuthenticatedHandler): RouteHandler =>
+  async (req, params) => {
     const auth = await assertAuthenticated(req);
     return handler(req, params, auth);
   };
-}
 
-type AdminHandler = (
-  req: Request,
-  params: Record<string, string>,
-  auth: AuthContext,
-) => Promise<Response>;
-
-export function withAdmin(handler: AdminHandler): RouteHandler {
-  return async (req, params) => {
+const withAdmin =
+  (handler: AdminHandler): RouteHandler =>
+  async (req, params) => {
     const auth = await assertAuthenticated(req);
 
     if (auth.role !== 'admin') {
@@ -66,4 +59,5 @@ export function withAdmin(handler: AdminHandler): RouteHandler {
 
     return handler(req, params, auth);
   };
-}
+
+export default { authenticate, withAuth, withAdmin };

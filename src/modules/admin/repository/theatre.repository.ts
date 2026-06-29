@@ -1,10 +1,12 @@
-import { db } from '@/database/postgres';
+import getDB from '@/database/postgres';
 import type {
   CreateTheatreInput,
   TheatreRecord,
   TheatreWithHalls,
   UpdateTheatreInput,
 } from '@/modules/admin/types/admin.types';
+
+const db = await getDB();
 
 type TheatreRow = {
   id: string;
@@ -14,17 +16,15 @@ type TheatreRow = {
   updated_at: Date;
 };
 
-function mapTheatre(row: TheatreRow): TheatreRecord {
-  return {
-    id: row.id,
-    name: row.name,
-    location: row.location,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+const mapTheatre = (row: TheatreRow): TheatreRecord => ({
+  id: row.id,
+  name: row.name,
+  location: row.location,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
-export async function findTheatres(): Promise<TheatreRecord[]> {
+const findTheatres = async (): Promise<TheatreRecord[]> => {
   const rows = await db<TheatreRow[]>`
     SELECT id, name, location, created_at, updated_at
     FROM theatres
@@ -32,11 +32,9 @@ export async function findTheatres(): Promise<TheatreRecord[]> {
   `;
 
   return rows.map(mapTheatre);
-}
+};
 
-export async function findTheatreById(
-  id: string,
-): Promise<TheatreRecord | null> {
+const findTheatreById = async (id: string): Promise<TheatreRecord | null> => {
   const [row] = await db<TheatreRow[]>`
     SELECT id, name, location, created_at, updated_at
     FROM theatres
@@ -45,11 +43,11 @@ export async function findTheatreById(
   `;
 
   return row ? mapTheatre(row) : null;
-}
+};
 
-export async function findTheatreWithHalls(
+const findTheatreWithHalls = async (
   id: string,
-): Promise<TheatreWithHalls | null> {
+): Promise<TheatreWithHalls | null> => {
   const theatre = await findTheatreById(id);
 
   if (!theatre) {
@@ -98,11 +96,11 @@ export async function findTheatreWithHalls(
       updatedAt: hall.updated_at,
     })),
   };
-}
+};
 
-export async function insertTheatre(
+const insertTheatre = async (
   input: CreateTheatreInput,
-): Promise<TheatreRecord> {
+): Promise<TheatreRecord> => {
   const now = new Date();
   const [row] = await db<TheatreRow[]>`
     INSERT INTO theatres (name, location, created_at, updated_at)
@@ -115,12 +113,12 @@ export async function insertTheatre(
   }
 
   return mapTheatre(row);
-}
+};
 
-export async function updateTheatreById(
+const updateTheatreById = async (
   id: string,
   input: UpdateTheatreInput,
-): Promise<TheatreRecord | null> {
+): Promise<TheatreRecord | null> => {
   const [existing] = await db<TheatreRow[]>`
     SELECT id, name, location, created_at, updated_at
     FROM theatres
@@ -143,9 +141,9 @@ export async function updateTheatreById(
   `;
 
   return row ? mapTheatre(row) : null;
-}
+};
 
-export async function countTheatreHalls(theatreId: string): Promise<number> {
+const countTheatreHalls = async (theatreId: string): Promise<number> => {
   const [row] = await db<{ count: number }[]>`
     SELECT COUNT(*)::int AS count
     FROM halls
@@ -153,13 +151,23 @@ export async function countTheatreHalls(theatreId: string): Promise<number> {
   `;
 
   return row!.count;
-}
+};
 
-export async function deleteTheatreById(id: string): Promise<boolean> {
+const deleteTheatreById = async (id: string): Promise<boolean> => {
   const result = await db`
     DELETE FROM theatres
     WHERE id = ${id}
   `;
 
   return result.count > 0;
-}
+};
+
+export default {
+  findTheatres,
+  findTheatreById,
+  findTheatreWithHalls,
+  insertTheatre,
+  updateTheatreById,
+  countTheatreHalls,
+  deleteTheatreById,
+};

@@ -1,9 +1,9 @@
 import '@/database/postgres';
-import { env } from '@/config/env';
-import { logger } from '@/core/logger/logger';
-import { handleRequest } from '@/routes/index';
+import env from '@/config/env';
+import logger from '@/core/logger/logger';
+import handleRequest from '@/routes/index';
 
-async function bootstrap() {
+const bootstrap = async () => {
   try {
     Bun.serve({
       port: Number(env.PORT),
@@ -30,9 +30,13 @@ async function bootstrap() {
 
     logger.info(`🚀 Server running on http://localhost:${env.PORT}`);
   } catch (error) {
-    logger.error(error);
+    if (error instanceof Error) {
+      logger.error(error);
+    } else {
+      logger.error(new Error(String(error)));
+    }
     process.exit(1);
   }
-}
+};
 
 void bootstrap();

@@ -1,8 +1,5 @@
 import { db } from '@/database/postgres';
-import {
-  assertSeatsAvailableForBooking,
-  releaseSeatLocksForBooking,
-} from '@/modules/seats/repository/seat.repository';
+import seatRepository from '@/modules/seats/repository/seat.repository';
 import type {
   BookingDetailRow,
   CancelBookingResult,
@@ -11,12 +8,12 @@ import type {
 const BOOKING_SELECT =
   'mb.id AS booking_id, st.id AS showtime_id, m.title AS movie_title, h.name AS hall_name, st.start_time, mb.status, mb.refund_status, mb.paid_amount::text AS paid_amount, mb.cancelled_at, mb.created_at, se.id AS seat_id, se.seat_number';
 
-export async function insertBooking(
+const insertBooking = async (
   userId: string,
   showtimeId: string,
   seatIds: string[],
-): Promise<string> {
-  return db.begin(async (tx) => {
+): Promise<string> =>
+  db.begin(async (tx) => {
     const [showtime] = await tx<{ ticket_price: string }[]>`
       SELECT ticket_price::text AS ticket_price
       FROM showtimes
@@ -40,7 +37,12 @@ export async function insertBooking(
       throw new Error('INVALID_SEATS');
     }
 
-    await assertSeatsAvailableForBooking(tx, showtimeId, userId, seatIds);
+    await seatRepository.assertSeatsAvailableForBooking(
+      tx,
+      showtimeId,
+      userId,
+      seatIds,
+    );
 
     const paidAmount = Number(showtime.ticket_price) * seatIds.length;
 
@@ -61,17 +63,18 @@ export async function insertBooking(
       `;
     }
 
-    await releaseSeatLocksForBooking(tx, showtimeId, userId, seatIds);
+    await seatRepository.releaseSeatLocksForBooking(
+      tx,
+      showtimeId,
+      userId,
+      seatIds,
+    );
 
     return booking.id;
   });
-}
 
-export async function findUserBookings(
-  userId: string,
-): Promise<BookingDetailRow[]> {
-
-  return db`
+const findUserBookings = async (userId: string): Promise<BookingDetailRow[]> =>
+  db`
     SELECT ${db.unsafe(BOOKING_SELECT)}
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
@@ -82,14 +85,12 @@ export async function findUserBookings(
     WHERE mb.user_id = ${userId}
     ORDER BY mb.created_at DESC, se.seat_number ASC NULLS LAST
   `;
-}
 
-export async function findBookingById(
+const findBookingById = async (
   bookingId: string,
   userId: string,
-): Promise<BookingDetailRow[]> {
-
-  return db`
+): Promise<BookingDetailRow[]> =>
+  db`
     SELECT ${db.unsafe(BOOKING_SELECT)}
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
@@ -101,13 +102,12 @@ export async function findBookingById(
       AND mb.user_id = ${userId}
     ORDER BY se.seat_number ASC NULLS LAST
   `;
-}
 
-export async function cancelBookingById(
+const cancelBookingById = async (
   bookingId: string,
   userId: string,
-): Promise<CancelBookingResult> {
-  return db.begin(async (tx) => {
+): Promise<CancelBookingResult> =>
+  db.begin(async (tx) => {
     const [booking] = await tx<
       {
         id: string;
@@ -162,14 +162,13 @@ export async function cancelBookingById(
       cancelledAt,
     };
   });
-}
 
-export async function updateBookingSeats(
+const updateBookingSeats = async (
   userId: string,
   bookingId: string,
   seatIds: string[],
-): Promise<string> {
-  return db.begin(async (tx) => {
+): Promise<string> =>
+  db.begin(async (tx) => {
     const [booking] = await tx<
       { id: string; showtime_id: string; status: string; start_time: Date }[]
     >`
@@ -207,7 +206,7 @@ export async function updateBookingSeats(
       throw new Error('INVALID_SEATS');
     }
 
-    await assertSeatsAvailableForBooking(
+    await seatRepository.assertSeatsAvailableForBooking(
       tx,
       showtimeId,
       userId,
@@ -242,8 +241,20 @@ export async function updateBookingSeats(
       WHERE id = ${bookingId}
     `;
 
-    await releaseSeatLocksForBooking(tx, showtimeId, userId, seatIds);
+    await seatRepository.releaseSeatLocksForBooking(
+      tx,
+      showtimeId,
+      userId,
+      seatIds,
+    );
 
     return bookingId;
   });
-}
+
+export default {
+  insertBooking,
+  findUserBookings,
+  findBookingById,
+  cancelBookingById,
+  updateBookingSeats,
+};

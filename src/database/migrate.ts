@@ -1,11 +1,13 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { db } from '@/database/postgres';
-import { logger } from '@/core/logger/logger';
+import getDB from '@/database/postgres';
+import logger from '@/core/logger/logger';
 
 const migrationsDir = path.join(import.meta.dir, 'migrations');
 
-export async function runMigrations(): Promise<void> {
+const runMigrations = async (): Promise<void> => {
+  const db = await getDB();
+
   await db`
     CREATE TABLE IF NOT EXISTS _migrations (
       id SERIAL PRIMARY KEY,
@@ -39,4 +41,6 @@ export async function runMigrations(): Promise<void> {
   }
 
   logger.info('Database migrations complete');
-}
+};
+
+export default runMigrations;

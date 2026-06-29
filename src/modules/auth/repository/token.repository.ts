@@ -1,18 +1,18 @@
 import { db } from '@/database/postgres';
 
-export async function blacklistAccessToken(
+const blacklistAccessToken = async (
   jti: string,
   userId: string,
   expiresAt: Date,
-): Promise<void> {
+): Promise<void> => {
   await db`
     INSERT INTO token_blacklist (jti, user_id, expires_at)
     VALUES (${jti}, ${userId}, ${expiresAt})
     ON CONFLICT (jti) DO NOTHING
   `;
-}
+};
 
-export async function isAccessTokenBlacklisted(jti: string): Promise<boolean> {
+const isAccessTokenBlacklisted = async (jti: string): Promise<boolean> => {
   const [row] = await db<{ exists: boolean }[]>`
     SELECT EXISTS (
       SELECT 1
@@ -23,22 +23,22 @@ export async function isAccessTokenBlacklisted(jti: string): Promise<boolean> {
   `;
 
   return row?.exists ?? false;
-}
+};
 
-export async function insertRefreshToken(
+const insertRefreshToken = async (
   userId: string,
   tokenHash: string,
   expiresAt: Date,
-): Promise<void> {
+): Promise<void> => {
   await db`
     INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
     VALUES (${userId}, ${tokenHash}, ${expiresAt})
   `;
-}
+};
 
-export async function findValidRefreshToken(
+const findValidRefreshToken = async (
   tokenHash: string,
-): Promise<{ userId: string; id: string } | null> {
+): Promise<{ userId: string; id: string } | null> => {
   const [row] = await db<{ user_id: string; id: string }[]>`
     SELECT user_id, id
     FROM refresh_tokens
@@ -53,26 +53,31 @@ export async function findValidRefreshToken(
   }
 
   return { userId: row.user_id, id: row.id };
-}
+};
 
-export async function revokeRefreshTokenByHash(
-  tokenHash: string,
-): Promise<void> {
+const revokeRefreshTokenByHash = async (tokenHash: string): Promise<void> => {
   await db`
     UPDATE refresh_tokens
     SET revoked_at = NOW()
     WHERE token_hash = ${tokenHash}
       AND revoked_at IS NULL
   `;
-}
+};
 
-export async function revokeAllUserRefreshTokens(
-  userId: string,
-): Promise<void> {
+const revokeAllUserRefreshTokens = async (userId: string): Promise<void> => {
   await db`
     UPDATE refresh_tokens
     SET revoked_at = NOW()
     WHERE user_id = ${userId}
       AND revoked_at IS NULL
   `;
-}
+};
+
+export default {
+  blacklistAccessToken,
+  isAccessTokenBlacklisted,
+  insertRefreshToken,
+  findValidRefreshToken,
+  revokeRefreshTokenByHash,
+  revokeAllUserRefreshTokens,
+};

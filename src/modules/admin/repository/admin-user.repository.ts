@@ -1,10 +1,12 @@
-import { db } from '@/database/postgres';
-import type { PaginationParams } from '@/core/types/pagination';
+import getDB from '@/database/postgres';
+import type { PaginationParams } from '@/core/types/pagination.types';
 import type {
   AdminUserRecord,
   UpdateUserBanInput,
   UpdateUserRoleInput,
 } from '@/modules/admin/types/admin.types';
+
+const db = await getDB();
 
 type AdminUserRow = {
   id: string;
@@ -17,25 +19,23 @@ type AdminUserRow = {
   updated_at: Date;
 };
 
-function mapAdminUser(row: AdminUserRow): AdminUserRecord {
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    role: row.role,
-    isBanned: row.is_banned,
-    bannedAt: row.banned_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+const mapAdminUser = (row: AdminUserRow): AdminUserRecord => ({
+  id: row.id,
+  name: row.name,
+  email: row.email,
+  role: row.role,
+  isBanned: row.is_banned,
+  bannedAt: row.banned_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
 const ADMIN_USER_COLUMNS =
   'id, name, email, role, is_banned, banned_at, created_at, updated_at';
 
-export async function findAdminUsers(
+const findAdminUsers = async (
   params: PaginationParams,
-): Promise<{ users: AdminUserRecord[]; total: number }> {
+): Promise<{ users: AdminUserRecord[]; total: number }> => {
   const offset = (params.page - 1) * params.limit;
 
   const [countRow] = await db<{ count: number }[]>`
@@ -54,12 +54,11 @@ export async function findAdminUsers(
     users: rows.map(mapAdminUser),
     total: countRow!.count,
   };
-}
+};
 
-export async function findAdminUserById(
+const findAdminUserById = async (
   id: string,
-): Promise<AdminUserRecord | null> {
-
+): Promise<AdminUserRecord | null> => {
   const [row] = await db<AdminUserRow[]>`
     SELECT ${db.unsafe(ADMIN_USER_COLUMNS)}
     FROM users
@@ -68,10 +67,9 @@ export async function findAdminUserById(
   `;
 
   return row ? mapAdminUser(row) : null;
-}
+};
 
-export async function isUserBanned(userId: string): Promise<boolean> {
-
+const isUserBanned = async (userId: string): Promise<boolean> => {
   const [row] = await db<{ is_banned: boolean }[]>`
     SELECT is_banned
     FROM users
@@ -80,13 +78,12 @@ export async function isUserBanned(userId: string): Promise<boolean> {
   `;
 
   return row?.is_banned ?? false;
-}
+};
 
-export async function updateUserRoleById(
+const updateUserRoleById = async (
   id: string,
   input: UpdateUserRoleInput,
-): Promise<AdminUserRecord | null> {
-
+): Promise<AdminUserRecord | null> => {
   const [row] = await db<AdminUserRow[]>`
     UPDATE users
     SET role = ${input.role}, updated_at = ${new Date()}
@@ -95,12 +92,12 @@ export async function updateUserRoleById(
   `;
 
   return row ? mapAdminUser(row) : null;
-}
+};
 
-export async function updateUserBanById(
+const updateUserBanById = async (
   id: string,
   input: UpdateUserBanInput,
-): Promise<AdminUserRecord | null> {
+): Promise<AdminUserRecord | null> => {
   const bannedAt = input.banned ? new Date() : null;
 
   const [row] = await db<AdminUserRow[]>`
@@ -114,4 +111,12 @@ export async function updateUserBanById(
   `;
 
   return row ? mapAdminUser(row) : null;
-}
+};
+
+export default {
+  findAdminUsers,
+  findAdminUserById,
+  isUserBanned,
+  updateUserRoleById,
+  updateUserBanById,
+};

@@ -1,12 +1,10 @@
-import type { Route } from '@/core/router/router';
-import {
-  getUserHandler,
-} from '@/modules/users/controllers/user.controller';
+import type { Route } from '@/core/router/router.types';
+import userController from '@/modules/users/controllers/user.controller';
 
-export const userRoutes: Route[] = [
+export default [
   {
     method: 'GET',
     path: '/api/users/:id',
-    handler: getUserHandler,
+    handler: userController.getUserHandler,
   },
-];
+] satisfies Route[];

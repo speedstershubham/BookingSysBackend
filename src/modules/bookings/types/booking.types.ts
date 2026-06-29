@@ -1,10 +1,6 @@
 export type BookingStatus = 'confirmed' | 'cancelled';
 
-export type RefundStatus =
-  | 'none'
-  | 'pending'
-  | 'completed'
-  | 'not_applicable';
+export type RefundStatus = 'none' | 'pending' | 'completed' | 'not_applicable';
 
 export type CreateBookingInput = {
   showtimeId: string;
