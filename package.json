@@ -10,8 +10,16 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
+    "validate": "bun run lint && bun run format:check && bun run type-check",
     "type-check": "tsc --noEmit",
-    "db:migrate": "bun src/scripts/migrate-db.ts"
+    "db:migrate": "bun src/scripts/migrate-db.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

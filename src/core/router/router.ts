@@ -36,8 +36,9 @@ const matchRoute = (
   return params;
 };
 
-const createRouter = (routes: Route[]) => {
-  return async (req: Request): Promise<Response | null> => {
+const createRouter =
+  (routes: Route[]) =>
+  async (req: Request): Promise<Response | null> => {
     const url = new URL(req.url);
 
     for (const route of routes) {
@@ -71,6 +72,5 @@ const createRouter = (routes: Route[]) => {
 
     return null;
   };
-};
 
 export default createRouter;

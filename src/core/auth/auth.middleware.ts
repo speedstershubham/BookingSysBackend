@@ -20,8 +20,9 @@ const authenticate = (req: Request): JwtPayload => {
   }
 };
 
-const withAuth = (handler: AuthenticatedHandler): RouteHandler => {
-  return (req, params) => handler(req, params, authenticate(req));
-};
+const withAuth =
+  (handler: AuthenticatedHandler): RouteHandler =>
+  (req, params) =>
+    handler(req, params, authenticate(req));
 
 export default { authenticate, withAuth };
