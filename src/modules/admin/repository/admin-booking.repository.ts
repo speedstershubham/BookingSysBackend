@@ -1,6 +1,7 @@
 import getDB from '@/database/postgres';
 import type {
   AdminBookingRecord,
+  AdminBookingRow,
   BookingsReport,
   BookingsReportFilters,
   ListBookingsFilters,
@@ -13,26 +14,6 @@ import type {
 } from '@/modules/admin/types/admin.types';
 
 const db = await getDB();
-
-type AdminBookingRow = {
-  booking_id: string;
-  user_id: string;
-  user_name: string;
-  user_email: string;
-  showtime_id: string;
-  movie_title: string;
-  hall_name: string;
-  theatre_name: string;
-  start_time: Date;
-  ticket_price: string;
-  status: string;
-  refund_status: string;
-  paid_amount: string;
-  cancelled_at: Date | null;
-  created_at: Date;
-  seat_id: string | null;
-  seat_number: number | null;
-};
 
 const groupBookingRows = (rows: AdminBookingRow[]): AdminBookingRecord[] => {
   const bookings = new Map<string, AdminBookingRecord>();
@@ -366,13 +347,9 @@ const getBookingsReport = async (
   const movieId = filters.movieId ?? null;
   const trunc = bookingsReportTrunc(filters.groupBy);
 
-  const rows = await db<
-    { period: Date; booking_count: number; seats_sold: number }[]
-  >`
-    SELECT
-      DATE_TRUNC(${trunc}, mb.created_at) AS period,
-      COUNT(DISTINCT mb.id)::int AS booking_count,
-      COUNT(mbs.id)::int AS seats_sold
+  type ReportRow = { period: Date; booking_count: number; seats_sold: number };
+
+  const filtersClause = db`
     FROM movie_bookings mb
     JOIN showtimes st ON st.id = mb.showtime_id
     JOIN movies m ON m.id = st.movie_id
@@ -382,9 +359,41 @@ const getBookingsReport = async (
       AND (${to}::timestamptz IS NULL OR mb.created_at <= ${to})
       AND (${userId}::uuid IS NULL OR mb.user_id = ${userId})
       AND (${movieId}::uuid IS NULL OR m.id = ${movieId})
-    GROUP BY DATE_TRUNC(${trunc}, mb.created_at)
-    ORDER BY period ASC
   `;
+
+  let rows: ReportRow[];
+
+  if (trunc === 'week') {
+    rows = await db<ReportRow[]>`
+      SELECT
+        DATE_TRUNC('week', mb.created_at) AS period,
+        COUNT(DISTINCT mb.id)::int AS booking_count,
+        COUNT(mbs.id)::int AS seats_sold
+      ${filtersClause}
+      GROUP BY period
+      ORDER BY period ASC
+    `;
+  } else if (trunc === 'month') {
+    rows = await db<ReportRow[]>`
+      SELECT
+        DATE_TRUNC('month', mb.created_at) AS period,
+        COUNT(DISTINCT mb.id)::int AS booking_count,
+        COUNT(mbs.id)::int AS seats_sold
+      ${filtersClause}
+      GROUP BY period
+      ORDER BY period ASC
+    `;
+  } else {
+    rows = await db<ReportRow[]>`
+      SELECT
+        DATE_TRUNC('day', mb.created_at) AS period,
+        COUNT(DISTINCT mb.id)::int AS booking_count,
+        COUNT(mbs.id)::int AS seats_sold
+      ${filtersClause}
+      GROUP BY period
+      ORDER BY period ASC
+    `;
+  }
 
   return {
     from: from?.toISOString() ?? null,

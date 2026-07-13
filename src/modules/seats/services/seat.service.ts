@@ -1,5 +1,6 @@
 import env from '@/config/env';
 import AppError from '@/core/errors/app-error';
+import websocketServer from '@/core/websocket/websocket.server';
 import movieService from '@/modules/movies/services/movie.service';
 import seatRepository from '@/modules/seats/repository/seat.repository';
 import type {
@@ -127,6 +128,8 @@ const updateSeatStatus = async (
 
     throw error;
   }
+
+  websocketServer.broadcastSeatsUpdated(showtimeId, uniqueSeatIds);
 
   return getShowtimeSeats(showtimeId, userId);
 };

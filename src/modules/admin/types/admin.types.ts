@@ -39,6 +39,26 @@ export type UpdateHallInput = {
   capacity?: number;
 };
 
+export type AdminBookingRow = {
+  booking_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  showtime_id: string;
+  movie_title: string;
+  hall_name: string;
+  theatre_name: string;
+  start_time: Date;
+  ticket_price: string;
+  status: string;
+  refund_status: string;
+  paid_amount: string;
+  cancelled_at: Date | null;
+  created_at: Date;
+  seat_id: string | null;
+  seat_number: number | null;
+};
+
 export type AdminBookingRecord = {
   id: string;
   userId: string;

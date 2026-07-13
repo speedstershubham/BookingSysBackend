@@ -1,5 +1,6 @@
 import env from '@/config/env';
 import AppError from '@/core/errors/app-error';
+import websocketServer from '@/core/websocket/websocket.server';
 import postgresError from '@/core/errors/postgres-error';
 import bookingRepository from '@/modules/bookings/repository/booking.repository';
 import type {
@@ -151,6 +152,8 @@ const saveBooking = async (
       throw new AppError(500, 'Failed to create booking');
     }
 
+    websocketServer.broadcastSeatsUpdated(showtimeId, uniqueSeatIds);
+
     return mapBookingRows(booking);
   } catch (error) {
     if (error instanceof Error) {
@@ -189,8 +192,25 @@ const cancelBooking = async (
   userId: string,
   bookingId: string,
 ): Promise<CancelBookingResult> => {
+  const existing = await bookingRepository.findBookingById(bookingId, userId);
+
+  if (existing.length === 0) {
+    throw new AppError(404, 'Booking not found');
+  }
+
+  const showtimeId = existing[0]!.showtime_id;
+  const seatIds = existing
+    .map((row) => row.seat_id)
+    .filter((id): id is string => id !== null);
+
   try {
-    return await bookingRepository.cancelBookingById(bookingId, userId);
+    const result = await bookingRepository.cancelBookingById(bookingId, userId);
+
+    if (seatIds.length > 0) {
+      websocketServer.broadcastSeatsUpdated(showtimeId, seatIds);
+    }
+
+    return result;
   } catch (error) {
     if (error instanceof Error) {
       return handleBookingMutationError(error);
@@ -266,6 +286,8 @@ const updateBooking = async (
     if (updated.length === 0) {
       throw new AppError(500, 'Failed to update booking');
     }
+
+    websocketServer.broadcastSeatsUpdated(showtimeId, uniqueSeatIds);
 
     return mapBookingRows(updated);
   } catch (error) {
